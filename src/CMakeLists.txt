@@ -25,6 +25,8 @@ set_target_properties(papi_core PROPERTIES
 )
 
 set(PAPI_BINDING_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/python/expansion_trampoline.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/python/gil_safe_proxy.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/python/module.cpp"
         PARENT_SCOPE
 )

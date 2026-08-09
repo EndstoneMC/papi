@@ -1,13 +1,21 @@
 #include <memory>
 #include <string>
+#include <vector>
 
+#include <pybind11/native_enum.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "endstone_papi/events.h"
+#include "endstone_papi/expansion_info.h"
 #include "endstone_papi/placeholder_api.h"
+#include "endstone_papi/placeholder_expansion.h"
+#include "endstone_papi/unregister_reason.h"
 #include "endstone_papi/version.h"
 
 #include "platform/endstone/bootstrap.h"
+#include "python/expansion_trampoline.h"
+#include "python/gil_safe_proxy.h"
 
 namespace py = pybind11;
 
@@ -15,16 +23,48 @@ namespace {
 
 /**
  * @brief Owns the native service on behalf of the Python PAPI plugin.
+ *
+ * The Python plugin holds one of these and does nothing else. All framework state lives
+ * natively, so a torn-down Python object cannot leave the registry in a bad state:
+ * shutdown is driven explicitly from on_disable while the interpreter and every
+ * provider module are still loaded.
  */
 class PapiHost {
 public:
     bool start(endstone::Plugin &plugin) { return bootstrap_.start(plugin); }
+
     void stop() { bootstrap_.stop(); }
+
     [[nodiscard]] std::shared_ptr<papi::PlaceholderAPI> getService() const { return bootstrap_.getService(); }
 
 private:
     papi::detail::PapiBootstrap bootstrap_;
 };
+
+/**
+ * @brief Registers an expansion supplied from Python.
+ *
+ * The provider is wrapped in a GIL-safe proxy before it reaches the registry, so every
+ * later callback and the final release happen with the GIL held. A native expansion
+ * passed in from Python is wrapped identically: the extra acquisition is cheap next to
+ * getting the ownership rules wrong.
+ */
+bool registerExpansionFromPython(papi::PlaceholderAPI &service, endstone::Plugin &owner, const py::object &expansion)
+{
+    auto *native = expansion.cast<papi::PlaceholderExpansion *>();
+    if (native == nullptr) {
+        throw py::type_error("expansion must be a PlaceholderExpansion");
+    }
+
+    // Constructed with the GIL held, which is where metadata is read and cached.
+    auto proxy = std::make_shared<papi::python::GilSafeExpansionProxy>(expansion, *native);
+
+    // Registration calls into the registry and may invoke the proxy, which reacquires
+    // the GIL as needed. The GIL is released here so a provider callback running on the
+    // server thread cannot deadlock against Python code on another thread.
+    const py::gil_scoped_release release;
+    return service.registerExpansion(owner, std::move(proxy));
+}
 
 }  // namespace
 
@@ -38,10 +78,73 @@ PYBIND11_MODULE(_papi, m)
     m.attr("__version__") = std::string(papi::getVersion());
     m.attr("SERVICE_NAME") = std::string(papi::PlaceholderAPI::ServiceName);
 
+    py::native_enum<papi::UnregisterReason>(m, "UnregisterReason", "enum.Enum",
+                                            "Why an expansion was removed from the registry.")
+        .value("EXPLICIT", papi::UnregisterReason::Explicit)
+        .value("OWNER_DISABLED", papi::UnregisterReason::OwnerDisabled)
+        .value("REQUIRED_PLUGIN_DISABLED", papi::UnregisterReason::RequiredPluginDisabled)
+        .value("PAPI_SHUTDOWN", papi::UnregisterReason::PapiShutdown)
+        .finalize();
+
+    py::class_<papi::ExpansionInfo>(m, "ExpansionInfo",
+                                    "An immutable copy of a registered expansion's metadata. Stays valid after the "
+                                    "expansion it describes is unregistered.")
+        .def_readonly("identifier", &papi::ExpansionInfo::identifier, "The canonical, lowercase identifier.")
+        .def_readonly("name", &papi::ExpansionInfo::name, "The expansion's display name.")
+        .def_readonly("author", &papi::ExpansionInfo::author, "The expansion's author.")
+        .def_readonly("version", &papi::ExpansionInfo::version, "The expansion's version.")
+        .def_readonly("owner", &papi::ExpansionInfo::owner, "The plugin that registered the expansion.")
+        .def_readonly("required_plugin", &papi::ExpansionInfo::required_plugin,
+                      "The plugin the expansion requires, or None.")
+        .def_readonly("relational", &papi::ExpansionInfo::relational,
+                      "Whether the expansion handles relational placeholders.")
+        .def("__eq__",
+             [](const papi::ExpansionInfo &self, const py::object &other) {
+                 if (!py::isinstance<papi::ExpansionInfo>(other)) {
+                     return false;
+                 }
+                 return self == other.cast<papi::ExpansionInfo>();
+             })
+        .def("__repr__", [](const papi::ExpansionInfo &self) {
+            return "ExpansionInfo(identifier='" + self.identifier + "', version='" + self.version + "', owner='" +
+                   self.owner + "')";
+        });
+
+    // Subclassable from Python. smart_holder plus trampoline_self_life_support let the
+    // native registry hold the last reference to a Python-derived object safely.
+    py::class_<papi::PlaceholderExpansion, papi::python::PyPlaceholderExpansion, py::smart_holder>(
+        m, "PlaceholderExpansion",
+        "Base class for placeholder providers. Subclass this and register it with the "
+        "PlaceholderAPI service.")
+        .def(py::init<>())
+        .def_property_readonly("identifier", &papi::PlaceholderExpansion::getIdentifier,
+                               "The identifier this expansion answers to.")
+        .def_property_readonly("author", &papi::PlaceholderExpansion::getAuthor, "The expansion's author.")
+        .def_property_readonly("version", &papi::PlaceholderExpansion::getVersion, "The expansion's version.")
+        .def_property_readonly("name", &papi::PlaceholderExpansion::getName, "The expansion's display name.")
+        .def_property_readonly("required_plugin", &papi::PlaceholderExpansion::getRequiredPlugin,
+                               "The plugin this expansion requires, or None.")
+        .def("can_register", &papi::PlaceholderExpansion::canRegister, "Final chance to refuse registration.")
+        .def("supports_relational_placeholders", &papi::PlaceholderExpansion::supportsRelationalPlaceholders,
+             "Whether this expansion answers relational placeholders.")
+        .def("supports_player_cleanup", &papi::PlaceholderExpansion::supportsPlayerCleanup,
+             "Whether this expansion wants to be told when a player quits.")
+        .def("on_request", &papi::PlaceholderExpansion::onRequest, py::arg("player"), py::arg("params"),
+             "Resolves an ordinary placeholder. Return a str, or None to leave the placeholder untouched.")
+        .def("on_relational_request", &papi::PlaceholderExpansion::onRelationalRequest, py::arg("one"), py::arg("two"),
+             py::arg("params"), "Resolves a relational placeholder between two online players.")
+        .def("on_player_quit", &papi::PlaceholderExpansion::onPlayerQuit, py::arg("player"),
+             "Called when a player leaves, if this expansion opted into cleanup.")
+        .def("on_unregister", &papi::PlaceholderExpansion::onUnregister, py::arg("reason"),
+             "Called once after this expansion has been removed from the registry.");
+
     // The service is native and final: Python consumes it but never implements it.
+    // py::is_final makes a Python subclass a TypeError rather than something that
+    // silently appears to work while bypassing the framework's lifecycle.
     py::class_<papi::PlaceholderAPI, endstone::Service, std::shared_ptr<papi::PlaceholderAPI>>(
         m, "PlaceholderAPI", "Resolves placeholders through registered expansions.", py::is_final())
-        .def_property_readonly("active", &papi::PlaceholderAPI::isActive, "Whether this service is still usable.")
+        .def_property_readonly("active", &papi::PlaceholderAPI::isActive,
+                               "Whether this service is still usable. False once PAPI has been disabled.")
         .def("set_placeholders", &papi::PlaceholderAPI::setPlaceholders, py::arg("player"), py::arg("text"),
              "Replaces every resolvable {identifier_params} in text.")
         .def("set_relational_placeholders", &papi::PlaceholderAPI::setRelationalPlaceholders, py::arg("one"),
@@ -54,12 +157,27 @@ PYBIND11_MODULE(_papi, m)
                                "Every registered identifier, sorted canonically.")
         .def_property_readonly("expansions", &papi::PlaceholderAPI::getExpansions,
                                "Metadata for every registered expansion, sorted by identifier.")
+        .def("register_expansion", &registerExpansionFromPython, py::arg("owner"), py::arg("expansion"),
+             "Registers an expansion on behalf of a plugin.")
         .def("unregister_expansion", &papi::PlaceholderAPI::unregisterExpansion, py::arg("owner"),
              py::arg("identifier"), "Unregisters one expansion owned by a plugin.")
         .def("unregister_expansions", &papi::PlaceholderAPI::unregisterExpansions, py::arg("owner"),
              "Unregisters every expansion owned by a plugin.");
 
-    // Private bootstrap surface. Only the PAPI plugin uses it.
+    py::class_<papi::ExpansionRegisteredEvent, endstone::Event>(
+        m, "ExpansionRegisteredEvent", "Fired after an expansion has been added to the registry.")
+        .def_property_readonly("expansion_info", &papi::ExpansionRegisteredEvent::getExpansionInfo,
+                               "Metadata describing the expansion that was registered.");
+
+    py::class_<papi::ExpansionUnregisteredEvent, endstone::Event>(
+        m, "ExpansionUnregisteredEvent", "Fired after an expansion has been removed from the registry.")
+        .def_property_readonly("expansion_info", &papi::ExpansionUnregisteredEvent::getExpansionInfo,
+                               "Metadata describing the expansion that was removed.")
+        .def_property_readonly("reason", &papi::ExpansionUnregisteredEvent::getReason,
+                               "Why the expansion was removed.");
+
+    // Private bootstrap surface. Only the PAPI plugin uses it; it is deliberately not
+    // part of the documented API and grants no way to implement the service.
     py::class_<PapiHost>(m, "_PapiHost", "Internal: owns the native PlaceholderAPI service.")
         .def(py::init<>())
         .def("start", &PapiHost::start, py::arg("plugin"),
