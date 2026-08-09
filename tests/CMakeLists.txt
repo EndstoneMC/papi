@@ -3,9 +3,10 @@ cmake_minimum_required(VERSION 3.29)
 find_package(GTest REQUIRED)
 include(GoogleTest)
 
-# Native test binary. Every suite links the private core directly so registry,
-# parser, and lifecycle internals can be exercised without a running server.
 add_executable(papi_test
+        cpp/test_error_throttle.cpp
+        cpp/test_expansion_manager.cpp
+        cpp/test_identifier.cpp
         cpp/test_public_api.cpp
         cpp/test_version.cpp
 )
@@ -21,15 +22,12 @@ gtest_discover_tests(papi_test
         PROPERTIES TIMEOUT 120
 )
 
-# Each public header must compile on its own, in its own translation unit, using
-# only the packaged include directory. This catches missing includes that a
-# combined test would hide.
 file(GLOB PAPI_PUBLIC_HEADERS RELATIVE "${PROJECT_SOURCE_DIR}/include/endstone_papi"
         "${PROJECT_SOURCE_DIR}/include/endstone_papi/*.h")
 
 set(PAPI_HEADER_TU_SOURCES "")
 foreach (header IN LISTS PAPI_PUBLIC_HEADERS)
-    string(REGEX REPLACE "\\.h$" "" stem "${header}")
+    string(REGEX REPLACE "\.h$" "" stem "${header}")
     set(generated "${CMAKE_CURRENT_BINARY_DIR}/headers/include_${stem}.cpp")
     file(CONFIGURE OUTPUT "${generated}" CONTENT
             "#include <endstone_papi/${header}>\n" @ONLY)
@@ -41,7 +39,5 @@ target_link_libraries(papi_header_self_contained PRIVATE endstone_papi::endstone
 target_compile_options(papi_header_self_contained PRIVATE
         $<$<CXX_COMPILER_ID:Clang>:-Wno-deprecated-declarations>)
 
-# A third-party consumer compiles against the installed header layout only, with
-# no access to the private core, proving the public contract stands alone.
 add_executable(papi_consumer_compile cpp/consumer_compile.cpp)
 target_link_libraries(papi_consumer_compile PRIVATE endstone_papi::endstone_papi)
