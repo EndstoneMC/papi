@@ -8,6 +8,7 @@ add_executable(papi_test
         cpp/test_error_throttle.cpp
         cpp/test_expansion_manager.cpp
         cpp/test_identifier.cpp
+        cpp/test_events.cpp
         cpp/test_lifecycle.cpp
         cpp/test_public_api.cpp
         cpp/test_relational.cpp
