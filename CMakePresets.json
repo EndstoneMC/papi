@@ -1,0 +1,37 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 29,
+    "patch": 0
+  },
+  "include": [
+    "build/RelWithDebInfo/generators/CMakePresets.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "papi-dev",
+      "displayName": "PAPI development build",
+      "inherits": "conan-relwithdebinfo",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "PAPI_BUILD_EXAMPLES": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "papi-dev",
+      "configurePreset": "papi-dev"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "papi-dev",
+      "configurePreset": "papi-dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

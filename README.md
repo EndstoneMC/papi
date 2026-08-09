@@ -145,7 +145,22 @@ There are a number of built-in placeholders that can be used once papi is instal
 
 Python: 3.10+
 
-Endstone: 0.6+
+Endstone: 0.11.8 (API 0.11)
+
+## Building from source
+
+Requires CMake 3.29+, Ninja, Conan 2, and the Endstone toolchain: `clang-cl` on
+Windows (from an x64 MSVC developer environment) or Clang with libc++ on Linux.
+
+```shell
+python -m pip install "conan>=2,<3"
+conan install . --build=missing
+cmake --preset papi-dev
+cmake --build --preset papi-dev
+ctest --preset papi-dev --output-on-failure
+python -m pytest -q
+python -m build --wheel
+```
 
 ## Contributing
 

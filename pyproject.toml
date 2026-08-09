@@ -1,43 +1,82 @@
 [build-system]
-requires = ["scikit-build-core-conan", "pybind11"]
+requires = ["scikit-build-core-conan>=0.9.2", "pybind11>=3.0,<4"]
 build-backend = "scikit_build_core_conan.build"
 
 [project]
 name = "endstone-papi"
-version = "0.0.1"
+version = "1.0.0.dev0"
 authors = [
     { name = "Vincent Wu", email = "magicdroidx@gmail.com" },
     { name = "daoge_cmd", email = "3523206925@qq.com" },
 ]
-description = "A Placeholder API Plugin for Endstone."
+description = "PlaceholderAPI framework for Endstone, with C++ and Python expansion providers."
 readme = "README.md"
-requires-python = ">=3.9"
-keywords = ["plugin", "python", "c++", "minecraft", "bedrock", "papi"]
-license = { file = "LICENSE" }
+requires-python = ">=3.10"
+keywords = ["plugin", "python", "c++", "minecraft", "bedrock", "papi", "placeholder"]
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: C++",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/EndstoneMC/papi"
+Issues = "https://github.com/EndstoneMC/papi/issues"
 
 [project.entry-points."endstone"]
 papi = "endstone_papi:PlaceholderAPIPlugin"
 
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
 [tool.scikit-build]
-build-dir = "build/{wheel_tag}"
+cmake.version = ">=3.29"
 cmake.args = ["-G Ninja"]
 cmake.build-type = "RelWithDebInfo"
-cmake.define = { BUILD_TESTING = "OFF" }
+cmake.define = { BUILD_TESTING = "OFF", PAPI_BUILD_EXAMPLES = "OFF" }
 wheel.packages = ["endstone_papi"]
-wheel.license-files = ["LICENSE"]
 install.components = ["python"]
 install.strip = false
-sdist.exclude = ["endstone_papi/*.cpp"]
 
 [tool.scikit-build-core-conan]
 config = ["tools.cmake.cmaketoolchain:generator=Ninja"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+
+[tool.ruff]
+line-length = 120
+lint.extend-select = ["I", "E", "F"]
+# Endstone plugins describe commands and permissions as mutable class attributes; this
+# is the documented convention, so the lint rule that would otherwise flag them is
+# turned off for the plugin file alone.
+lint.per-file-ignores = { "endstone_papi/plugin.py" = ["RUF012"] }
+# The historical examples are replaced by the native core. They are excluded until the
+# phase that rewrites them, so lint failures in code slated for deletion do not mask
+# real problems.
+extend-exclude = [
+    "examples/python",
+]
+
 [tool.cibuildwheel]
-skip = ["pp*"]
+build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
+skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
+test-requires = "pytest"
+test-command = "pytest {package}/tests/python"
 
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "ghcr.io/endstonemc/manylinux_2_31_x86_64"
-environment = { LLVM_VERSION = 16, CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
+environment = { LLVM_VERSION = 20, CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
+before-build = "pip install ninja"
 before-all = [
     "apt-get update -y -q && apt-get install -y -q build-essential lsb-release wget software-properties-common gnupg",
     "wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh ${LLVM_VERSION}",
@@ -45,3 +84,6 @@ before-all = [
     "update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${LLVM_VERSION} 100",
     "update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${LLVM_VERSION} 100",
 ]
+
+[tool.cibuildwheel.windows]
+environment = { CC = "clang-cl", CXX = "clang-cl" }

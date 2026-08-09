@@ -2,37 +2,197 @@ name: Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [develop]
   pull_request:
+    branches: [develop]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build"
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: Build Wheel (${{ matrix.python-tag }}-${{ matrix.platform }})
+  native-linux:
+    name: Native (Linux)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Install Clang 20
+        run: |
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 20
+          sudo apt-get install -y clang-format-20 clang-tidy-20 libc++-20-dev libc++abi-20-dev
+          sudo ln -sf /usr/bin/clang-20 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-20 /usr/local/bin/clang++
+          clang --version | grep -E "clang version 20\\."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Conan
+        run: python -m pip install "conan>=2,<3"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: .conan2
+          key: ${{ runner.os }}-clang20-conan-${{ hashFiles('conanfile.py', '.conan2/profiles/default') }}
+
+      - name: Install dependencies
+        run: conan install . --build=missing
+
+      - name: Configure
+        run: cmake --preset papi-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: cmake --build --preset papi-dev
+
+      - name: Run tests
+        run: ctest --preset papi-dev --output-on-failure
+
+      - name: Check formatting
+        run: git ls-files '*.cpp' '*.h' | xargs clang-format-20 --dry-run --Werror
+
+      - name: Run clang-tidy
+        run: python tools/run_clang_tidy.py --build-dir build/RelWithDebInfo --clang-tidy clang-tidy-20
+
+      - name: Architecture boundaries
+        run: python tests/test_architecture_boundaries.py
+
+      - name: Changelog tooling tests
+        run: python tools/test_release_changelog.py
+
+  native-windows:
+    name: Native (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up MSVC environment
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+
+      - name: Select clang-cl 20
+        shell: pwsh
+        run: |
+          $llvmBin = "C:\Program Files\LLVM\bin"
+          $llvmBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $version = & "$llvmBin\clang-cl.exe" --version
+          $version
+          if (-not ($version | Select-String "clang version 20\.")) {
+            throw "clang-cl 20 is required"
+          }
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Conan
+        run: python -m pip install "conan>=2,<3"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: .conan2
+          key: ${{ runner.os }}-clang20-conan-${{ hashFiles('conanfile.py', '.conan2/profiles/default') }}
+
+      - name: Install dependencies
+        run: conan install . --build=missing
+
+      - name: Configure
+        run: cmake --preset papi-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: cmake --build --preset papi-dev
+
+      - name: Run tests
+        run: ctest --preset papi-dev --output-on-failure
+
+      - name: Check formatting
+        shell: pwsh
+        run: |
+          $files = git ls-files '*.cpp' '*.h'
+          & clang-format --dry-run --Werror $files
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run clang-tidy
+        run: python tools/run_clang_tidy.py --build-dir build/RelWithDebInfo --clang-tidy clang-tidy
+
+      - name: Architecture boundaries
+        run: python tests/test_architecture_boundaries.py
+
+  python:
+    name: Python
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: python -m pip install ruff
+
+      - name: Check formatting
+        run: python -m ruff format --check .
+
+      - name: Lint
+        run: python -m ruff check .
+
+  wheel:
+    name: Wheel (${{ matrix.python-tag }}-${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-2019 ]
-        python-tag: [ "cp39", "cp310", "cp311", "cp312", "cp313" ]
+        os: [ ubuntu-22.04, windows-latest ]
+        python-tag: [ "cp310", "cp311", "cp312", "cp313", "cp314" ]
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: manylinux_x86_64
-          - os: windows-2019
+          - os: windows-latest
             platform: win_amd64
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref || github.sha }}
           fetch-depth: 0
 
       - name: Set up MSVC (Windows)
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
-          arch: x86_64
+          arch: x64
 
       - name: Set up CMake and Ninja
         uses: lukka/get-cmake@latest
@@ -42,8 +202,69 @@ jobs:
         env:
           CIBW_BUILD: ${{ matrix.python-tag }}-${{ matrix.platform }}
           CIBW_BUILD_VERBOSITY: 1
+          CIBW_CONTAINER_ENGINE: "docker; create_args: --volume ${{ github.workspace }}/.conan2:/project/.conan2"
+
+      - name: Reclaim Conan home (Linux)
+        if: always() && runner.os == 'Linux'
+        run: sudo chown -R "$(id -u):$(id -g)" .conan2
+
+      - name: Verify wheel contents
+        shell: bash
+        run: |
+          python -c "
+          import zipfile, sys, pathlib
+          whl = list(pathlib.Path('wheelhouse').glob('*.whl'))[0]
+          z = zipfile.ZipFile(whl)
+          names = z.namelist()
+          assert any('_papi' in n for n in names), 'native module missing'
+          assert any(n.endswith('.pyi') for n in names), '.pyi missing'
+          assert any('include/endstone_papi' in n for n in names), 'headers missing'
+          assert any('LICENSE' in n for n in names), 'LICENSE missing'
+          print(f'OK: {len(names)} files in {whl.name}')
+          "
 
       - uses: actions/upload-artifact@v4
         with:
           name: papi-${{ matrix.python-tag }}-${{ matrix.platform }}
           path: ./wheelhouse/*.whl
+
+  sdist:
+    name: Sdist
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build
+        run: python -m pip install build
+
+      - name: Build sdist
+        run: python -m build --sdist
+
+      - name: Verify sdist contains native sources
+        shell: bash
+        run: |
+          python -c "
+          import tarfile, pathlib
+          sdist = list(pathlib.Path('dist').glob('*.tar.gz'))[0]
+          t = tarfile.open(sdist)
+          names = t.getnames()
+          for required in ['module.cpp', 'gil_safe_proxy.cpp', 'expansion_trampoline.cpp',
+                           'bootstrap.cpp', 'placeholder_api_impl.cpp']:
+              assert any(required in n for n in names), f'{required} missing from sdist'
+          print(f'OK: sdist contains all native sources')
+          "
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: papi-sdist
+          path: ./dist/*.tar.gz

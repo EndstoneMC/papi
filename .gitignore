@@ -13,3 +13,12 @@ CMakeUserPresets.json
 .idea
 build
 cmake-build-*/
+dist
+wheelhouse
+*.egg-info
+__pycache__
+.pytest_cache
+.ruff_cache
+*.pyd
+*.so
+*.pdb

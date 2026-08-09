@@ -1,35 +1,92 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.29)
 
-project(papi CXX)
+project(papi VERSION 1.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Endstone requires clang-cl on Windows and Clang/libc++ on Linux. PAPI ships C++
+# types across the plugin boundary, so it must use the same toolchain family.
+if (WIN32)
+    if (NOT (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
+        message(FATAL_ERROR
+                "endstone_papi: clang-cl is required on Windows, but CMake detected ${CMAKE_CXX_COMPILER_ID} "
+                "(frontend variant: ${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}). "
+                "Reconfigure with CC=clang-cl and CXX=clang-cl.")
+    endif ()
+    set(CMAKE_LINKER_TYPE LLD)
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+elseif (UNIX)
+    if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR
+                "endstone_papi: Clang is required on Linux, but CMake detected ${CMAKE_CXX_COMPILER_ID}. "
+                "Reconfigure with CC=clang and CXX=clang++.")
+    endif ()
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+else ()
+    message(FATAL_ERROR "endstone_papi: ${CMAKE_SYSTEM_NAME} is not supported")
+endif ()
+
+set(PAPI_ENDSTONE_TAG "v0.11.8" CACHE STRING "Endstone tag providing the public API headers")
 
 include(FetchContent)
 FetchContent_Declare(
         endstone
         GIT_REPOSITORY https://github.com/EndstoneMC/endstone.git
-        GIT_TAG v0.7.0
+        GIT_TAG ${PAPI_ENDSTONE_TAG}
+        GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(endstone)
 
+# Public consumer contract: headers plus the Endstone API they depend on.
+add_library(endstone_papi INTERFACE)
+add_library(endstone_papi::endstone_papi ALIAS endstone_papi)
+target_include_directories(endstone_papi INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
+target_link_libraries(endstone_papi INTERFACE endstone::endstone)
+target_compile_features(endstone_papi INTERFACE cxx_std_20)
+
+# Consumed as a subproject (FetchContent/add_subdirectory): expose headers only.
 if (NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    add_library(endstone_papi INTERFACE)
-    target_include_directories(endstone_papi INTERFACE include)
-    target_link_libraries(endstone_papi INTERFACE endstone::endstone)
     return()
 endif ()
 
-execute_process(
-        COMMAND "${Python_EXECUTABLE}" -m pybind11 --cmakedir
-        OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE pybind11_ROOT)
+add_subdirectory(src)
+
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
-pybind11_add_module(_${PROJECT_NAME} endstone_papi/_papi.cpp)
-target_include_directories(_${PROJECT_NAME} PRIVATE include)
-target_link_libraries(_${PROJECT_NAME} PRIVATE endstone::endstone)
-install(TARGETS _${PROJECT_NAME} DESTINATION "endstone_papi" COMPONENT python)
+pybind11_add_module(_papi ${PAPI_BINDING_SOURCES})
+target_include_directories(_papi PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(_papi PRIVATE papi_core)
+set_target_properties(_papi PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON)
+
+install(TARGETS _papi DESTINATION "endstone_papi" COMPONENT python)
 install(DIRECTORY include/ DESTINATION "endstone_papi/include" COMPONENT python)
 
+if (NOT BUILD_TESTING STREQUAL OFF)
+    enable_testing()
+    add_subdirectory(tests)
+endif ()
+
 add_subdirectory(examples/cpp)
+
+# Formats only repository-owned C++ sources; never fetched dependencies.
+file(GLOB_RECURSE PAPI_FORMAT_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
+find_program(PAPI_CLANG_FORMAT NAMES clang-format)
+if (PAPI_CLANG_FORMAT)
+    add_custom_target(format
+            COMMAND "${PAPI_CLANG_FORMAT}" -i ${PAPI_FORMAT_SOURCES}
+            COMMENT "Formatting C++ sources with clang-format"
+            VERBATIM)
+endif ()

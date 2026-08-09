@@ -57,4 +57,4 @@ public:
     [[nodiscard]] virtual bool registerPlaceholder(const endstone::Plugin &plugin, std::string_view identifier,
                                                    Processor processor) const = 0;
 };
-} // namespace papi
+}  // namespace papi

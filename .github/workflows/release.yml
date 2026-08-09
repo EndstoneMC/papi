@@ -1,0 +1,282 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.0.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Preview without making changes"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Prepare release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.release_meta.outputs.version }}
+      dry_run: ${{ steps.release_meta.outputs.dry_run }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate release
+        id: release_meta
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          DRY_RUN="${{ inputs.dry_run }}"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            exit 1
+          fi
+
+          if [[ "$DRY_RUN" != "true" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Non-dry-run releases must run from main"
+            exit 1
+          fi
+
+          if git rev-parse --verify --quiet "refs/tags/v$VERSION"; then
+            echo "::error::Tag v$VERSION already exists"
+            exit 1
+          fi
+
+          if [[ "$DRY_RUN" != "true" ]]; then
+            git fetch origin main develop --tags
+            if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ||
+                  "$(git rev-parse HEAD)" != "$(git rev-parse origin/develop)" ]]; then
+              echo "::error::release ref, main, and develop must point to the same commit before releasing"
+              exit 1
+            fi
+          fi
+
+          DATE=$(date -u +%Y-%m-%d)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "DATE=$DATE" >> "$GITHUB_ENV"
+          echo "DRY_RUN=$DRY_RUN" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare changelog and release notes
+        shell: bash
+        run: |
+          python tools/release_changelog.py \
+            --version "$VERSION" \
+            --date "$DATE" \
+            --repository "${{ github.repository }}" \
+            --output /tmp/CHANGELOG.md \
+            --notes /tmp/release_body.md
+          echo "Release notes:"
+          cat /tmp/release_body.md
+
+      - name: Preview
+        if: env.DRY_RUN == 'true'
+        shell: bash
+        run: |
+          echo "=== Dry Run ==="
+          echo "Ref: ${{ github.ref }}"
+          echo "Version: $VERSION"
+          echo "Tag: v$VERSION"
+          echo "Date: $DATE"
+          echo
+          echo "=== Current versions ==="
+          grep -F 'project(papi VERSION ' CMakeLists.txt
+          grep -F 'version = ' pyproject.toml | head -1
+          echo
+          echo "=== Versions after update ==="
+          echo "project(papi VERSION $VERSION LANGUAGES CXX)"
+          echo "version = \"$VERSION\""
+          echo
+          echo "=== Changelog changes ==="
+          diff -u CHANGELOG.md /tmp/CHANGELOG.md || true
+          echo
+          echo "=== Release notes ==="
+          cat /tmp/release_body.md
+
+      - name: Update release files
+        if: env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          sed -E -i "s/^project\(papi VERSION [0-9]+\.[0-9]+\.[0-9]+ LANGUAGES CXX\)$/project(papi VERSION $VERSION LANGUAGES CXX)/" CMakeLists.txt
+          sed -E -i "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+(\.[a-z0-9]+)?\"$/version = \"$VERSION\"/" pyproject.toml
+          cp /tmp/CHANGELOG.md CHANGELOG.md
+
+      - name: Verify versions
+        if: env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          grep -Fx "project(papi VERSION $VERSION LANGUAGES CXX)" CMakeLists.txt
+          grep -Fx "version = \"$VERSION\"" pyproject.toml
+          test "$(grep -Fc "## [$VERSION]" CHANGELOG.md)" -eq 1
+          test -s /tmp/release_body.md
+          git diff --check
+
+      - name: Commit and tag
+        if: env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt pyproject.toml CHANGELOG.md
+          git commit -m "chore: release v$VERSION"
+          git tag "v$VERSION"
+          git push --atomic origin HEAD:main HEAD:develop "refs/tags/v$VERSION"
+
+      - name: Upload release notes
+        if: env.DRY_RUN != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: /tmp/release_body.md
+          if-no-files-found: error
+
+  build-windows:
+    name: Build (Windows)
+    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.version != ''
+    needs: release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Set up MSVC environment
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+
+      - name: Set up CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.23.0
+        env:
+          CIBW_BUILD: "cp310-cp314-win_amd64"
+          CIBW_BUILD_VERBOSITY: 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-wheels
+          path: ./wheelhouse/*.whl
+
+  build-linux:
+    name: Build (Linux)
+    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.version != ''
+    needs: release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Set up CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.23.0
+        env:
+          CIBW_BUILD: "cp310-cp314-manylinux_x86_64"
+          CIBW_BUILD_VERBOSITY: 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-wheels
+          path: ./wheelhouse/*.whl
+
+  build-sdist:
+    name: Build (sdist)
+    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.version != ''
+    needs: release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build
+        run: python -m pip install build
+
+      - name: Build sdist
+        run: python -m build --sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-sdist
+          path: ./dist/*.tar.gz
+
+  publish:
+    name: Publish GitHub Release
+    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.version != ''
+    needs: [release, build-windows, build-linux, build-sdist]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          find artifacts -name '*.whl' -exec cp {} release-assets/ \;
+          find artifacts -name '*.tar.gz' -exec cp {} release-assets/ \;
+          cp artifacts/release-notes/release_body.md release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.release.outputs.version }}
+          name: v${{ needs.release.outputs.version }}
+          body_path: release-assets/release_body.md
+          files: |
+            release-assets/*.whl
+            release-assets/*.tar.gz
+          draft: false
+          prerelease: false
