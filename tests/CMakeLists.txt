@@ -4,6 +4,7 @@ find_package(GTest REQUIRED)
 include(GoogleTest)
 
 add_executable(papi_test
+        cpp/test_bracket_replacer.cpp
         cpp/test_error_throttle.cpp
         cpp/test_expansion_manager.cpp
         cpp/test_identifier.cpp

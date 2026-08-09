@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.29)
 
 add_library(papi_core STATIC
+        core/parser/bracket_replacer.cpp
         core/parser/identifier.cpp
         core/registry/expansion_manager.cpp
         core/diagnostics/error_throttle.cpp
