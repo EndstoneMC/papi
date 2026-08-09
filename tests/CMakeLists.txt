@@ -9,6 +9,7 @@ add_executable(papi_test
         cpp/test_expansion_manager.cpp
         cpp/test_identifier.cpp
         cpp/test_public_api.cpp
+        cpp/test_service.cpp
         cpp/test_version.cpp
 )
 

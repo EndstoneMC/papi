@@ -4,8 +4,11 @@ add_library(papi_core STATIC
         core/parser/bracket_replacer.cpp
         core/parser/identifier.cpp
         core/registry/expansion_manager.cpp
+        core/service/placeholder_api_impl.cpp
         core/diagnostics/error_throttle.cpp
         core/version.cpp
+        platform/endstone/bootstrap.cpp
+        platform/endstone/server_platform.cpp
 )
 
 target_include_directories(papi_core

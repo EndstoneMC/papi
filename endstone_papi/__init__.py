@@ -1,6 +1,6 @@
 """Endstone PlaceholderAPI."""
 
-from ._papi import __version__
+from ._papi import SERVICE_NAME, PlaceholderAPI, __version__
 from .plugin import PlaceholderAPIPlugin
 
-__all__ = ["PlaceholderAPIPlugin", "__version__"]
+__all__ = ["SERVICE_NAME", "PlaceholderAPI", "PlaceholderAPIPlugin", "__version__"]
