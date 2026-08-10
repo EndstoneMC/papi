@@ -266,7 +266,7 @@ jobs:
   sdist:
     name: Sdist
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -299,6 +299,33 @@ jobs:
               assert any(required in n for n in names), f'{required} missing from sdist'
           print(f'OK: sdist contains all native sources')
           "
+
+      - name: Install Clang 20
+        run: |
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 20
+          sudo apt-get install -y libc++-20-dev libc++abi-20-dev
+          sudo ln -sf /usr/bin/clang-20 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-20 /usr/local/bin/clang++
+          clang --version | grep -E "clang version 20\\."
+
+      - name: Install Conan and build tools
+        run: python -m pip install "conan>=2,<3" cmake ninja scikit-build-core-conan "pybind11>=3.0,<4"
+
+      - name: Build wheel from sdist
+        shell: bash
+        run: |
+          sdist="$(python -c 'import pathlib; print(list(pathlib.Path("dist").glob("*.tar.gz"))[0])')"
+          pip wheel --no-deps --no-build-isolation "$sdist" -w wheelhouse/
+
+      - name: Runtime smoke test from sdist-built wheel
+        shell: bash
+        run: |
+          python -m pip install endstone==0.11.8
+          whl="$(python -c 'import pathlib; print(list(pathlib.Path("wheelhouse").glob("*.whl"))[0])')"
+          python -m pip install --no-deps "$whl"
+          python tools/wheel_smoke_test.py
 
       - uses: actions/upload-artifact@v4
         with:
