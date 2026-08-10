@@ -50,3 +50,33 @@ target_compile_options(papi_header_self_contained PRIVATE
 
 add_executable(papi_consumer_compile cpp/consumer_compile.cpp)
 target_link_libraries(papi_consumer_compile PRIVATE endstone_papi::endstone_papi)
+
+# T-009: External provider DSO fixture, built from public headers only.
+# Simulates a real C++ provider plugin linking against the installed SDK.
+add_library(papi_provider_fixture SHARED fixtures/provider/provider_demo.cpp)
+target_link_libraries(papi_provider_fixture PRIVATE endstone_papi::endstone_papi)
+set_target_properties(papi_provider_fixture PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+        POSITION_INDEPENDENT_CODE ON)
+# Keep the fixture output next to the test binary so the test can find it by path.
+set_target_properties(papi_provider_fixture PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+
+# T-009: Test that loads the provider fixture DSO and validates the full
+# register -> request -> unregister/disable/shutdown -> unload lifecycle.
+add_executable(papi_provider_dso_test cpp/test_provider_dso.cpp)
+target_include_directories(papi_provider_dso_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpp
+        ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(papi_provider_dso_test PRIVATE
+        papi_core
+        GTest::gmock_main
+        ${CMAKE_DL_LIBS})
+target_compile_definitions(papi_provider_dso_test PRIVATE
+        PAPI_PROVIDER_DSO_PATH="$<TARGET_FILE:papi_provider_fixture>")
+gtest_discover_tests(papi_provider_dso_test
+        DISCOVERY_MODE PRE_TEST
+        PROPERTIES TIMEOUT 120)
