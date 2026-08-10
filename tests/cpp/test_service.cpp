@@ -13,8 +13,6 @@
 
 namespace {
 
-using papi::ExpansionInfo;
-using papi::PlaceholderAPI;
 using papi::UnregisterReason;
 using papi::detail::ErrorThrottleWindow;
 using papi::detail::PlaceholderApiImpl;
@@ -512,7 +510,7 @@ TEST_F(ServiceTest, LegacyProcessorRegistrationUsesTheNormalLifecycle)
 {
     int calls = 0;
     const bool registered = service_->registerPlaceholder(
-        owner_, "legacy", [&calls](const endstone::Player *player, const std::string params) {
+        owner_, "legacy", [&calls](const endstone::Player *player, const std::string &params) {
             ++calls;
             EXPECT_EQ(player, nullptr);
             return "value:" + params;

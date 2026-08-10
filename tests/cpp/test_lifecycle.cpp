@@ -14,7 +14,6 @@
 
 namespace {
 
-using papi::PlaceholderAPI;
 using papi::UnregisterReason;
 using papi::detail::PlaceholderApiImpl;
 using papi::testing::FakeExpansion;
