@@ -11,7 +11,6 @@
 
 namespace {
 
-using papi::ExpansionInfo;
 using papi::UnregisterReason;
 using papi::detail::ErrorThrottle;
 using papi::detail::ExpansionManager;

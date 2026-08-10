@@ -12,6 +12,7 @@ Checks: >
   -bugprone-exception-escape,
   -bugprone-implicit-widening-of-multiplication-result,
   -bugprone-unused-raii,
+  -bugprone-unchecked-optional-access,
   -misc-const-correctness,
   -misc-non-private-member-variables-in-classes,
   -misc-include-cleaner,
