@@ -1,5 +1,7 @@
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <endstone/plugin/plugin_description.h>
@@ -14,6 +16,7 @@
 #include "endstone_papi/unregister_reason.h"
 #include "endstone_papi/version.h"
 
+#include "core/deprecation.h"
 #include "platform/endstone/bootstrap.h"
 #include "python/expansion_trampoline.h"
 #include "python/gil_safe_proxy.h"
@@ -41,6 +44,110 @@ public:
 private:
     papi::detail::PapiBootstrap bootstrap_;
 };
+
+/**
+ * @brief Deprecated Python callback adapter for register_placeholder.
+ *
+ * Wraps a Python callable as a PlaceholderExpansion so it participates in the normal
+ * owner-aware registry. Unlike the C++ Processor adapter, the callable may return
+ * None to leave the placeholder unresolved (the original token is preserved).
+ *
+ * Every crossing into Python acquires the GIL, and the final release of the stored
+ * handle happens under the GIL so the registry can drop the last reference from
+ * anywhere safely.
+ */
+class PythonLegacyExpansion final : public papi::PlaceholderExpansion {
+public:
+    PythonLegacyExpansion(std::string identifier, std::string owner, py::object callback)
+        : identifier_(std::move(identifier)), owner_(std::move(owner)), callback_(std::move(callback))
+    {
+    }
+
+    ~PythonLegacyExpansion() override  // NOLINT(bugprone-exception-escape)
+    {
+        if (callback_) {
+            const py::gil_scoped_acquire gil;
+            callback_ = py::none();
+        }
+    }
+
+    PythonLegacyExpansion(const PythonLegacyExpansion &) = delete;
+    PythonLegacyExpansion(PythonLegacyExpansion &&) = delete;
+    PythonLegacyExpansion &operator=(const PythonLegacyExpansion &) = delete;
+    PythonLegacyExpansion &operator=(PythonLegacyExpansion &&) = delete;
+
+    [[nodiscard]] std::string getIdentifier() const override { return identifier_; }
+    [[nodiscard]] std::string getAuthor() const override { return owner_; }
+    [[nodiscard]] std::string getVersion() const override { return "legacy"; }
+    [[nodiscard]] std::string getName() const override { return identifier_; }
+
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
+                                                       const std::string_view params) override
+    {
+        if (!callback_) {
+            return std::nullopt;
+        }
+        const py::gil_scoped_acquire gil;
+        if (!callback_) {
+            return std::nullopt;
+        }
+        try {
+            // A null player arrives in Python as None, matching on_request semantics.
+            const auto result = callback_(py::cast(player), py::str(std::string(params)));
+            if (result.is_none()) {
+                return std::nullopt;
+            }
+            // Exact str check: reject str subclasses per the frozen provider contract.
+            if (Py_TYPE(result.ptr()) != &PyUnicode_Type) {
+                throw std::runtime_error("register_placeholder callback must return str or None, got " +
+                                         py::str(py::type::handle_of(result)).cast<std::string>());
+            }
+            return result.cast<std::string>();
+        }
+        catch (py::error_already_set &error) {
+            // Rethrown as a plain C++ exception so no Python state escapes into the
+            // native error path, where the GIL is no longer guaranteed.
+            throw std::runtime_error(error.what());
+        }
+    }
+
+    void onUnregister(papi::UnregisterReason) override
+    {
+        // Drop the callback here rather than at destruction so it cannot survive into a
+        // window where its plugin's code may already be gone.
+        const py::gil_scoped_acquire gil;
+        callback_ = py::none();
+    }
+
+private:
+    std::string identifier_;
+    std::string owner_;
+    py::object callback_;
+};
+
+/**
+ * @brief Deprecated adapter: registers a Python callable as a placeholder.
+ *
+ * The callable is wrapped in a PythonLegacyExpansion and registered through the normal
+ * owner-aware registry, so it participates in lifecycle, duplicate rejection, and
+ * error containment exactly like a full PlaceholderExpansion. Returns true if the
+ * placeholder was registered.
+ */
+bool registerPlaceholderFromPython(papi::PlaceholderAPI &service, endstone::Plugin &owner,
+                                   const std::string &identifier, const py::object &callback)
+{
+    if (!py::isinstance<py::function>(callback) && !py::hasattr(callback, "__call__")) {
+        throw py::type_error("register_placeholder callback must be callable");
+    }
+
+    auto expansion = std::make_shared<PythonLegacyExpansion>(identifier, owner.getName(), callback);
+
+    // Registration may invoke the expansion (metadata, preflight), which reacquires the
+    // GIL. The GIL is released here so a provider callback on the server thread cannot
+    // deadlock against Python code on another thread.
+    const py::gil_scoped_release release;
+    return service.registerExpansion(owner, std::move(expansion));
+}
 
 /**
  * @brief Registers an expansion supplied from Python.
@@ -140,6 +247,11 @@ public:
     bool registerExpansion(const py::object &expansion)
     {
         return registerExpansionFromPython(*service_, *plugin_, expansion);
+    }
+
+    bool registerPlaceholder(const std::string &identifier, const py::object &callback)
+    {
+        return registerPlaceholderFromPython(*service_, *plugin_, identifier, callback);
     }
 
     bool unregisterExpansion(std::string_view identifier)
@@ -266,7 +378,25 @@ PYBIND11_MODULE(_papi, m)
         .def("unregister_expansion", &papi::PlaceholderAPI::unregisterExpansion, py::arg("owner"),
              py::arg("identifier"), "Unregisters one expansion owned by a plugin.")
         .def("unregister_expansions", &papi::PlaceholderAPI::unregisterExpansions, py::arg("owner"),
-             "Unregisters every expansion owned by a plugin.");
+             "Unregisters every expansion owned by a plugin.")
+        // Deprecated one-release Python compatibility adapters (T-013 / A-003).
+        // register_placeholder wraps a Python callable in an internal expansion so it
+        // shares the owner-aware registry, rejects duplicate identifiers, and does not
+        // resurrect colon fallback. The callable may return None to leave the
+        // placeholder unresolved, unlike the C++ Processor adapter.
+        .def("register_placeholder", &registerPlaceholderFromPython, py::arg("owner"), py::arg("identifier"),
+             py::arg("callback"), "Deprecated: register a callable as a placeholder. Prefer register_expansion.")
+        // placeholder_pattern returns the historical bracket regex for source
+        // compatibility. It is not used by the parser and describes neither the current
+        // syntax nor the current implementation.
+        .def_property_readonly(
+            "placeholder_pattern",
+            [](const papi::PlaceholderAPI &self) {
+                PAPI_SUPPRESS_DEPRECATED_BEGIN
+                return self.getPlaceholderPattern();
+                PAPI_SUPPRESS_DEPRECATED_END
+            },
+            "Deprecated: the historical bracket regex [{]([^{}]+)[}]. Not used by the parser.");
 
     py::class_<papi::ExpansionRegisteredEvent, endstone::Event>(
         m, "ExpansionRegisteredEvent", "Fired after an expansion has been added to the registry.")
@@ -312,8 +442,11 @@ PYBIND11_MODULE(_papi, m)
     py::class_<TestService>(m, "_TestService", "Test-only: PlaceholderAPI backed by an in-memory platform.")
         .def(py::init<std::string>(), py::arg("plugin_name"))
         .def_property_readonly("service", &TestService::service, "The native PlaceholderAPI service.")
+        .def_property_readonly("plugin", &TestService::plugin, "The test plugin (owner for registrations).")
         .def("register_expansion", &TestService::registerExpansion, py::arg("expansion"),
              "Registers a Python expansion through the GIL-safe proxy path.")
+        .def("register_placeholder", &TestService::registerPlaceholder, py::arg("identifier"), py::arg("callback"),
+             "Registers a deprecated Python callback placeholder through the native service.")
         .def("unregister_expansion", &TestService::unregisterExpansion, py::arg("identifier"),
              "Unregisters one expansion owned by the test plugin.")
         .def("unregister_expansions", &TestService::unregisterExpansions,

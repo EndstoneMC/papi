@@ -25,8 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   post-commit events
 - Bounded 60-second error throttling with injectable monotonic clock
 - Strict ASCII identifier grammar `[A-Za-z0-9][A-Za-z0-9.-]*`
-- Deprecated C++ `Processor` adapter and `getPlaceholderPattern` for one-release
-  source compatibility
+- Deprecated C++ `Processor` adapter and `getPlaceholderPattern`, and Python
+  `register_placeholder` and `placeholder_pattern`, for one-release source
+  compatibility
 - Windows and Linux CI with clang-cl/Clang 20, Conan 2, CMake 3.29, and
   CPython 3.10–3.14 wheel matrix
 - Architecture boundary enforcement via automated tests

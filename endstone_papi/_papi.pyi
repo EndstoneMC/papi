@@ -1,6 +1,7 @@
 """Type stubs for the native PlaceholderAPI core."""
 
 import enum
+from collections.abc import Callable
 
 from endstone import OfflinePlayer, Player
 from endstone.event import Event
@@ -174,6 +175,25 @@ class PlaceholderAPI(Service):
 
     def unregister_expansions(self, owner: Plugin) -> int:
         """Unregisters every expansion owned by a plugin."""
+
+    def register_placeholder(
+        self, owner: Plugin, identifier: str, callback: Callable[[OfflinePlayer | None, str], str | None]
+    ) -> bool:
+        """Deprecated: register a callable as a placeholder.
+
+        Prefer ``register_expansion``. The callable receives the player (or None) and
+        the raw parameter string, and returns a ``str`` value or None to leave the
+        placeholder text untouched. Shares the owner-aware registry: duplicate
+        identifiers are rejected and there is no colon fallback.
+        """
+
+    @property
+    def placeholder_pattern(self) -> str:
+        """Deprecated: the historical bracket regex ``[{]([^{}]+)[}]``.
+
+        Returned for source compatibility only. It is not used by the parser and
+        describes neither the current syntax nor the current implementation.
+        """
 
 class ExpansionRegisteredEvent(Event):
     """Fired after an expansion has been added to the registry."""
