@@ -77,10 +77,12 @@ public:
     [[nodiscard]] bool isOwnedBy(const endstone::Plugin &plugin) const noexcept;
 
     /**
-     * @brief Marks the entry ineligible for new calls.
+     * @brief Marks the entry ineligible for new calls and clears the owner identity.
      *
      * Idempotent. Returns true only for the caller that performed the transition,
-     * which is how double cleanup is prevented.
+     * which is how double cleanup is prevented.  The raw owner pointer is cleared
+     * atomically so a retired entry can never retain a stale plugin identity,
+     * even while a deferred cleanup waits for an in-flight call lease.
      */
     bool retire() noexcept;
 
@@ -116,11 +118,6 @@ public:
      * released under the GIL.
      */
     [[nodiscard]] std::shared_ptr<PlaceholderExpansion> releaseExpansion();
-
-    /**
-     * @brief Clears the owner identity without touching the plugin.
-     */
-    void clearOwner() noexcept;
 
 private:
     friend class CallLease;

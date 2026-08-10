@@ -551,7 +551,8 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
         auto released = entry->releaseExpansion();
         released.reset();
 
-        entry->clearOwner();
+        // owner_ was already cleared atomically at retirement, so no stale
+        // plugin identity survives the deferred-cleanup window.
         throttle_.forget(generation);
 
         if (reason != UnregisterReason::PapiShutdown) {

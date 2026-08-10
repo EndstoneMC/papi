@@ -415,10 +415,43 @@ TEST_F(ExpansionManagerTest, RetiredEntryClearsOwnerIdentity)
     auto removed = manager_.detach(owner_, "demo", UnregisterReason::Explicit);
     ASSERT_TRUE(removed.has_value());
 
-    EXPECT_EQ(removed->entry->getOwner(), &owner_);
-    removed->entry->clearOwner();
+    // T-025: owner_ is cleared atomically at retirement, not deferred to cleanup.
+    // The copied ExpansionInfo.owner string is still available for diagnostics.
     EXPECT_EQ(removed->entry->getOwner(), nullptr);
     EXPECT_FALSE(removed->entry->isOwnedBy(owner_));
+    EXPECT_EQ(removed->info.owner, owner_.getName());
+}
+
+// T-025: even when cleanup is deferred by an active call lease, the retired
+// entry's raw owner identity must be null immediately.  The self-unregister
+// case -- a provider unregistering from inside its own callback -- is the
+// scenario where the deferred window is longest.
+TEST_F(ExpansionManagerTest, RetiredEntryClearsOwnerEvenWithDeferredCleanup)
+{
+    add("demo", owner_);
+    const auto entry = manager_.findCanonical("demo");
+    ASSERT_NE(entry, nullptr);
+
+    {
+        auto lease = manager_.lease("demo");
+        ASSERT_TRUE(static_cast<bool>(lease));
+        ASSERT_TRUE(manager_.detach(owner_, "demo", UnregisterReason::Explicit).has_value());
+
+        // The lease is still active (deferred cleanup), but the owner is already gone.
+        EXPECT_TRUE(entry->hasActiveCalls());
+        EXPECT_EQ(entry->getOwner(), nullptr);
+        EXPECT_FALSE(entry->isOwnedBy(owner_));
+
+        // The copied metadata string is still intact for diagnostics/events.
+        EXPECT_EQ(entry->getInfo().owner, owner_.getName());
+
+        bool cleanup_ran = false;
+        EXPECT_FALSE(entry->requestCleanup([&] { cleanup_ran = true; }));
+        EXPECT_FALSE(cleanup_ran);
+    }
+
+    // Deferred cleanup runs when the lease exits; owner stays null throughout.
+    EXPECT_EQ(entry->getOwner(), nullptr);
 }
 
 TEST_F(ExpansionManagerTest, GenerationsAreUniquePerRegistration)

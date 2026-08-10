@@ -98,6 +98,11 @@ bool ExpansionEntry::retire() noexcept
         return false;
     }
     active_ = false;
+    // Clear the raw owner identity as part of the atomic retirement transition so
+    // a retired entry can never retain a stale plugin pointer -- even while a
+    // deferred cleanup waits for an in-flight call lease to exit.  The copied
+    // ExpansionInfo.owner string remains available for diagnostics and events.
+    owner_ = nullptr;
     return true;
 }
 
@@ -133,12 +138,6 @@ std::shared_ptr<PlaceholderExpansion> ExpansionEntry::releaseExpansion()
 {
     std::scoped_lock lock(mutex_);
     return std::move(expansion_);
-}
-
-void ExpansionEntry::clearOwner() noexcept
-{
-    std::scoped_lock lock(mutex_);
-    owner_ = nullptr;
 }
 
 CallLease::CallLease(std::shared_ptr<ExpansionEntry> entry)
