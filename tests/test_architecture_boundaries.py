@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify that source layers respect architectural boundaries.
 
 PAPI Architecture B dependency model:

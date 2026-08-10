@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run clang-tidy on project-owned translation units.
 
 Reads the CMake compilation database (compile_commands.json) and runs clang-tidy on

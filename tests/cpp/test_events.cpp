@@ -135,15 +135,15 @@ TEST_F(EventsTest, EventsCarryCopiedMetadataOnly)
     const auto &event = platform_->events.back();
     EXPECT_EQ(event.name, "ExpansionRegisteredEvent");
     ASSERT_TRUE(event.info.has_value());
-    EXPECT_EQ(event.info->identifier, "demo");
-    EXPECT_EQ(event.info->author, "Endstone");
-    EXPECT_EQ(event.info->version, "2.0");
-    EXPECT_EQ(event.info->owner, "provider");
+    EXPECT_EQ(event.info.value().identifier, "demo");
+    EXPECT_EQ(event.info.value().author, "Endstone");
+    EXPECT_EQ(event.info.value().version, "2.0");
+    EXPECT_EQ(event.info.value().owner, "provider");
 
     // Destroy the provider; the snapshot in the event must not dangle.
     ASSERT_TRUE(service_->unregisterExpansion(owner_, "demo"));
-    EXPECT_EQ(platform_->events.back().info->identifier, "demo");
-    EXPECT_EQ(platform_->events.back().info->version, "2.0");
+    EXPECT_EQ(platform_->events.back().info.value().identifier, "demo");
+    EXPECT_EQ(platform_->events.back().info.value().version, "2.0");
 }
 
 TEST_F(EventsTest, BulkUnregisterEmitsEventsForEachEntry)

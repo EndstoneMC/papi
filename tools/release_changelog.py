@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Deterministic changelog and release-note generation for Endstone PAPI.
 
 Usage:

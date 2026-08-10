@@ -21,7 +21,7 @@ public:
     void advance(const std::chrono::steady_clock::duration delta) { now_ += delta; }
 
 private:
-    std::chrono::steady_clock::time_point now_{};
+    std::chrono::steady_clock::time_point now_;
 };
 
 // EXC-003
@@ -135,6 +135,7 @@ TEST(ErrorThrottle, IsSafeUnderConcurrentUse)
     std::atomic<int> logged{0};
     std::vector<std::thread> threads;
 
+    threads.reserve(8);
     for (int t = 0; t < 8; ++t) {
         threads.emplace_back([&] {
             for (int i = 0; i < 2000; ++i) {

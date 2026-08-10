@@ -28,7 +28,7 @@ public:
     [[nodiscard]] std::optional<std::string> resolve(const std::string_view canonical_identifier,
                                                      const std::string_view params) override
     {
-        lookups.push_back(Lookup{std::string(canonical_identifier), std::string(params)});
+        lookups.push_back(Lookup{.identifier = std::string(canonical_identifier), .params = std::string(params)});
         if (handler) {
             return handler(canonical_identifier, params);
         }

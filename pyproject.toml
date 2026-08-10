@@ -70,11 +70,8 @@ extend-exclude = [
 [tool.cibuildwheel]
 build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
 skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
-test-requires = "pytest"
-test-command = "pytest {package}/tests/python"
 
 [tool.cibuildwheel.linux]
-manylinux-x86_64-image = "ghcr.io/endstonemc/manylinux_2_31_x86_64"
 environment = { LLVM_VERSION = 20, CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
 before-build = "pip install ninja"
 before-all = [

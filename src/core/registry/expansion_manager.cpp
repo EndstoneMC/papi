@@ -403,8 +403,8 @@ std::vector<RemovedEntry> ExpansionManager::detachForDisabledPlugin(const endsto
         for (auto it = entries_.begin(); it != entries_.end();) {
             const auto &entry = it->second;
             const bool owned = entry->isOwnedBy(plugin);
-            const bool depends =
-                entry->getInfo().required_plugin.has_value() && *entry->getInfo().required_plugin == plugin_name;
+            const auto info = entry->getInfo();
+            const bool depends = info.required_plugin.has_value() && *info.required_plugin == plugin_name;
             if (owned || depends) {
                 // An entry that is both owned by and dependent on the plugin is
                 // removed once, attributed to its owner.
