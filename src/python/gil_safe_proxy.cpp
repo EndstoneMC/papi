@@ -66,7 +66,7 @@ GilSafeExpansionProxy::GilSafeExpansionProxy(py::object handle, PlaceholderExpan
     // a metadata exception surfaces as an atomic registration failure.
 }
 
-GilSafeExpansionProxy::~GilSafeExpansionProxy()
+GilSafeExpansionProxy::~GilSafeExpansionProxy()  // NOLINT(bugprone-exception-escape)
 {
     if (!handle_) {
         return;

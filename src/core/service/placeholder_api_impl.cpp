@@ -91,7 +91,7 @@ public:
         }
     }
 
-    ~ActiveExpansionGuard()
+    ~ActiveExpansionGuard()  // NOLINT(bugprone-exception-escape)
     {
         if (pushed_) {
             activeGenerations().erase(generation_);
@@ -194,6 +194,7 @@ public:
     {
     }
 
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     [[nodiscard]] std::optional<std::string> resolve(const std::string_view canonical_identifier,
                                                      const std::string_view params) override
     {
@@ -241,11 +242,13 @@ private:
  */
 class PlaceholderApiImpl::RelationalResolver final : public PlaceholderResolver {
 public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     RelationalResolver(const PlaceholderApiImpl &service, const endstone::Player &one, const endstone::Player &two)
         : service_(service), one_(one), two_(two)
     {
     }
 
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     [[nodiscard]] std::optional<std::string> resolve(const std::string_view canonical_identifier,
                                                      const std::string_view params) override
     {
@@ -314,7 +317,7 @@ PlaceholderApiImpl::PlaceholderApiImpl(std::shared_ptr<Platform> platform, std::
 {
 }
 
-PlaceholderApiImpl::~PlaceholderApiImpl()
+PlaceholderApiImpl::~PlaceholderApiImpl()  // NOLINT(bugprone-exception-escape)
 {
     // A correctly managed service is already shut down by its plugin. This is only a
     // backstop for a service that is destroyed without one.

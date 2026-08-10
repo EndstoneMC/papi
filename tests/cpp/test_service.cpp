@@ -210,6 +210,7 @@ TEST_F(ServiceTest, ParseDepthBudgetIsEnforced)
     for (int i = 0; i < chain_length; ++i) {
         auto exp = std::make_shared<FakeExpansion>("e" + std::to_string(i));
         const auto next_token = (i + 1 < chain_length) ? "{e" + std::to_string(i + 1) + "_x}" : "leaf";
+        // NOLINTNEXTLINE(bugprone-exception-escape)
         exp->on_request = [&, next_token](const endstone::OfflinePlayer *, std::string_view) {
             return service_->setPlaceholders(nullptr, next_token);
         };

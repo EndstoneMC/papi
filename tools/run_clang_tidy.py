@@ -51,7 +51,7 @@ def main() -> int:
 
     def check(source: pathlib.Path) -> tuple[pathlib.Path, subprocess.CompletedProcess[str]]:
         root_pattern = re.escape(root.as_posix())
-        header_filter = rf"^{root_pattern}/(?:src|tests)/"
+        header_filter = rf"^{root_pattern}/(?:src|tests|include)/"
         command = [args.clang_tidy, "--quiet", f"--header-filter={header_filter}", "-p", str(build_dir), str(source)]
         if args.fix:
             command.append("--fix-errors")

@@ -9,6 +9,9 @@
 #include "core/registry/expansion_manager.h"
 #include "fakes.h"
 
+// GoogleTest ASSERT_TRUE(x.has_value()) aborts on failure, but clang-tidy
+// cannot track this through the macro, producing false positives below.
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
 namespace {
 
 using papi::UnregisterReason;
@@ -625,3 +628,4 @@ TEST_F(ExpansionManagerTest, MetadataQueriesAreSafeWhileTheRegistryMutates)
 }
 
 }  // namespace
+// NOLINTEND(bugprone-unchecked-optional-access)

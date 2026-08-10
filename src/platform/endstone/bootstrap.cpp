@@ -11,7 +11,7 @@ namespace papi::detail {
 
 PapiBootstrap::PapiBootstrap() = default;
 
-PapiBootstrap::~PapiBootstrap()
+PapiBootstrap::~PapiBootstrap()  // NOLINT(bugprone-exception-escape)
 {
     stop();
 }

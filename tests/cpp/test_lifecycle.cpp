@@ -31,12 +31,13 @@ using papi::testing::FakePlugin;
  */
 class ModuleBackedExpansion final : public papi::PlaceholderExpansion {
 public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     ModuleBackedExpansion(std::string identifier, bool &module_loaded, int &destructions)
         : identifier_(std::move(identifier)), module_loaded_(module_loaded), destructions_(destructions)
     {
     }
 
-    ~ModuleBackedExpansion() override
+    ~ModuleBackedExpansion() override  // NOLINT(bugprone-exception-escape)
     {
         EXPECT_TRUE(module_loaded_) << "expansion destroyed after its module was unloaded";
         ++destructions_;

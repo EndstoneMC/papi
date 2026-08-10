@@ -284,7 +284,7 @@ TEST(BracketReplacer, InputWithoutCandidatesIsReturnedUnchangedWithoutLookups)
 TEST(BracketReplacer, BinaryAndUtf8BytesPassThroughUnchanged)
 {
     RecordingResolver resolver;
-    const std::string text = std::string("caf\xc3\xa9 \xff\xfe", 9) + std::string("\0mid", 4);
+    const std::string text = std::string("caf\xc3\xa9 \xff\xfe\0", 9) + std::string("\0mid", 4);
     EXPECT_EQ(parse(text, resolver), text);
 
     // Multi-byte parameters are forwarded byte for byte.

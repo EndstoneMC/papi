@@ -8,6 +8,9 @@
 #include "fake_player.h"
 #include "fakes.h"
 
+// GoogleTest ASSERT_TRUE(x.has_value()) aborts on failure, but clang-tidy
+// cannot track this through the macro, producing false positives below.
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
 namespace {
 
 using papi::detail::PlaceholderApiImpl;
@@ -215,3 +218,4 @@ TEST_F(EventsTest, ShutdownSuppressesUnregisteredEvents)
 }
 
 }  // namespace
+// NOLINTEND(bugprone-unchecked-optional-access)

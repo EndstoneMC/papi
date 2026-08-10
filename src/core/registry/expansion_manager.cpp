@@ -161,7 +161,7 @@ CallLease::CallLease(CallLease &&other) noexcept : entry_(std::move(other.entry_
     other.entry_.reset();
 }
 
-CallLease &CallLease::operator=(CallLease &&other) noexcept
+CallLease &CallLease::operator=(CallLease &&other) noexcept  // NOLINT(bugprone-exception-escape)
 {
     if (this != &other) {
         release();
@@ -171,7 +171,7 @@ CallLease &CallLease::operator=(CallLease &&other) noexcept
     return *this;
 }
 
-CallLease::~CallLease()
+CallLease::~CallLease()  // NOLINT(bugprone-exception-escape)
 {
     release();
 }
