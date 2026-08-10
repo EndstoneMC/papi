@@ -445,8 +445,6 @@ bool PlaceholderApiImpl::unregisterExpansion(endstone::Plugin &owner, const std:
     }
 
     finishRemoval(*removed);
-    ExpansionUnregisteredEvent event{removed->info, removed->reason};
-    platform().callEvent(event);
     return true;
 }
 
@@ -459,10 +457,6 @@ std::size_t PlaceholderApiImpl::unregisterExpansions(endstone::Plugin &owner)
     auto removed = manager_.detachByOwner(owner, UnregisterReason::Explicit);
     for (auto &entry : removed) {
         finishRemoval(entry);
-    }
-    for (const auto &entry : removed) {
-        ExpansionUnregisteredEvent event{entry.info, entry.reason};
-        platform().callEvent(event);
     }
     return removed.size();
 }
@@ -506,10 +500,6 @@ void PlaceholderApiImpl::handlePluginDisabled(endstone::Plugin &plugin)
     for (auto &entry : removed) {
         finishRemoval(entry);
     }
-    for (const auto &entry : removed) {
-        ExpansionUnregisteredEvent event{entry.info, entry.reason};
-        platform().callEvent(event);
-    }
 }
 
 void PlaceholderApiImpl::handlePlayerQuit(const endstone::Player &player)
@@ -541,6 +531,10 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
     const auto generation = entry->getGeneration();
     const auto info = entry->getInfo();
 
+    // The unregister event is dispatched as the last step of cleanup so it always
+    // fires after onUnregister and provider release, even when cleanup is deferred
+    // by an active call lease. PapiShutdown suppresses it because the event system
+    // is itself being torn down.
     auto cleanup = [this, entry, reason, generation, info] {
         if (const auto expansion = entry->getExpansion()) {
             std::string error_message;
@@ -556,6 +550,11 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
 
         entry->clearOwner();
         throttle_.forget(generation);
+
+        if (reason != UnregisterReason::PapiShutdown) {
+            ExpansionUnregisteredEvent event{info, reason};
+            platform().callEvent(event);
+        }
     };
 
     if (entry->requestCleanup(cleanup)) {

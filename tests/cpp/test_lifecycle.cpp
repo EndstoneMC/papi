@@ -273,6 +273,48 @@ TEST_F(LifecycleTest, UnregisterIsVisibleImmediatelyEvenWhileACallbackRuns)
     EXPECT_EQ(expansion->unregister_calls, 1);
 }
 
+// T-011: the ExpansionUnregisteredEvent must fire after onUnregister and provider
+// release, not before them. When cleanup is deferred by an active call lease, the
+// event is dispatched from the deferred cleanup continuation, so a listener that
+// checks cleanup state sees a fully torn-down expansion.
+TEST_F(LifecycleTest, UnregisterEventFiresAfterDeferredCleanup)
+{
+    std::atomic<bool> inside_callback{false};
+    std::atomic<bool> may_return{false};
+
+    auto expansion = std::make_shared<FakeExpansion>("slow");
+    expansion->on_request = [&](const endstone::OfflinePlayer *, std::string_view) -> std::optional<std::string> {
+        inside_callback.store(true, std::memory_order_release);
+        while (!may_return.load(std::memory_order_acquire)) {
+            std::this_thread::yield();
+        }
+        return "value";
+    };
+    ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
+
+    std::thread parser([&] { EXPECT_EQ(service_->setPlaceholders(nullptr, "{slow_x}"), "{slow_x}"); });
+
+    while (!inside_callback.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
+
+    platform_->events.clear();
+    EXPECT_TRUE(service_->unregisterExpansion(owner_, "slow"));
+    // Cleanup is deferred: the event must not have fired yet.
+    EXPECT_EQ(expansion->unregister_calls, 0);
+    EXPECT_TRUE(platform_->events.empty());
+
+    may_return.store(true, std::memory_order_release);
+    parser.join();
+
+    // After the callback returns, the deferred cleanup runs onUnregister and then
+    // dispatches the event.
+    EXPECT_EQ(expansion->unregister_calls, 1);
+    ASSERT_EQ(platform_->events.size(), 1U);
+    EXPECT_EQ(platform_->events[0].name, "ExpansionUnregisteredEvent");
+    EXPECT_EQ(platform_->events[0].reason, UnregisterReason::Explicit);
+}
+
 // EXC-002
 TEST_F(LifecycleTest, NonStandardExceptionsAreContained)
 {
