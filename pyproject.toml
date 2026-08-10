@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core-conan>=0.9.2", "pybind11>=3.0,<4"]
+requires = ["scikit-build-core-conan>=0.9.2,<1.0", "pybind11>=3.0,<4"]
 build-backend = "scikit_build_core_conan.build"
 
 [project]
@@ -79,16 +79,18 @@ build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
 skip = ["pp*", "*-musllinux*", "*_i686", "*-win32"]
 
 [tool.cibuildwheel.linux]
-manylinux-x86_64-image = "manylinux_2_28"
+manylinux-x86_64-image = "manylinux_2_34"
 environment = { CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
 before-build = "pip install ninja"
 before-all = [
     "dnf install -y clang cmake ninja-build python3-pip wget xz",
-    "wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/llvm-project-17.0.6.src.tar.xz -O /tmp/llvm.tar.xz",
+    "clang --version | tee /tmp/toolchain-provenance.txt",
+    "clang --version | grep -E 'clang version (1[89]|[2-9][0-9])'",
+    "wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/llvm-project-20.1.0.src.tar.xz -O /tmp/llvm.tar.xz",
     "tar xf /tmp/llvm.tar.xz -C /tmp",
-    "cmake -B /tmp/libcxx-build -S /tmp/llvm-project-17.0.6.src/runtimes -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi' -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=OFF -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF",
+    "cmake -B /tmp/libcxx-build -S /tmp/llvm-project-20.1.0.src/runtimes -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi' -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=OFF -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF",
     "cmake --build /tmp/libcxx-build --target install-cxx install-cxxabi -- -j$(nproc)",
-    "rm -rf /tmp/llvm.tar.xz /tmp/llvm-project-17.0.6.src /tmp/libcxx-build",
+    "rm -rf /tmp/llvm.tar.xz /tmp/llvm-project-20.1.0.src /tmp/libcxx-build",
 ]
 
 [tool.cibuildwheel.windows]
