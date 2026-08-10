@@ -1,7 +1,7 @@
 // Verifies each public header is self-contained: including it alone must compile.
 // Deprecated members are declared in these headers, so warnings are silenced here
 // rather than at the declaration sites.
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
@@ -14,7 +14,7 @@
 #include "endstone_papi/unregister_reason.h"
 #include "endstone_papi/version.h"
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
 #endif
 

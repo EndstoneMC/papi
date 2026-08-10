@@ -75,25 +75,25 @@ ExpansionEntry::ExpansionEntry(const std::uint64_t generation, ExpansionInfo inf
 
 bool ExpansionEntry::isActive() const noexcept
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return active_;
 }
 
 endstone::Plugin *ExpansionEntry::getOwner() const noexcept
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return owner_;
 }
 
 bool ExpansionEntry::isOwnedBy(const endstone::Plugin &plugin) const noexcept
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return owner_ == &plugin;
 }
 
 bool ExpansionEntry::retire() noexcept
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (!active_) {
         return false;
     }
@@ -103,7 +103,7 @@ bool ExpansionEntry::retire() noexcept
 
 bool ExpansionEntry::requestCleanup(std::function<void()> cleanup)
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (cleanup_done_) {
         return false;
     }
@@ -119,25 +119,25 @@ bool ExpansionEntry::requestCleanup(std::function<void()> cleanup)
 
 bool ExpansionEntry::hasActiveCalls() const noexcept
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return active_calls_ > 0;
 }
 
 std::shared_ptr<PlaceholderExpansion> ExpansionEntry::getExpansion() const
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return expansion_;
 }
 
 std::shared_ptr<PlaceholderExpansion> ExpansionEntry::releaseExpansion()
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return std::move(expansion_);
 }
 
 void ExpansionEntry::clearOwner() noexcept
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     owner_ = nullptr;
 }
 
@@ -147,7 +147,7 @@ CallLease::CallLease(std::shared_ptr<ExpansionEntry> entry)
         return;
     }
     {
-        std::lock_guard lock(entry->mutex_);
+        std::scoped_lock lock(entry->mutex_);
         if (!entry->active_) {
             return;
         }
@@ -196,7 +196,7 @@ void CallLease::release()
     // during the call, then run it after the lock is dropped and the lease is gone.
     std::function<void()> deferred;
     {
-        std::lock_guard lock(entry_->mutex_);
+        std::scoped_lock lock(entry_->mutex_);
         --entry_->active_calls_;
         if (entry_->active_calls_ == 0 && entry_->deferred_cleanup_ && !entry_->cleanup_done_) {
             entry_->cleanup_done_ = true;
@@ -325,7 +325,7 @@ RegisterResult ExpansionManager::registerExpansion(endstone::Plugin &owner,
     }
 
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         if (!entries_.contains(info.identifier)) {
             auto entry = std::make_shared<ExpansionEntry>(next_generation_++, info, supports_player_cleanup,
                                                           std::move(expansion), &owner);
@@ -350,7 +350,7 @@ std::optional<RemovedEntry> ExpansionManager::detach(const endstone::Plugin &own
 
     std::shared_ptr<ExpansionEntry> entry;
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         const auto it = entries_.find(canonical);
         if (it == entries_.end() || !it->second->isOwnedBy(owner)) {
             return std::nullopt;
@@ -369,7 +369,7 @@ std::vector<RemovedEntry> ExpansionManager::detachByOwner(const endstone::Plugin
 {
     std::vector<std::shared_ptr<ExpansionEntry>> detached;
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         for (auto it = entries_.begin(); it != entries_.end();) {
             if (it->second->isOwnedBy(owner)) {
                 detached.push_back(it->second);
@@ -399,7 +399,7 @@ std::vector<RemovedEntry> ExpansionManager::detachForDisabledPlugin(const endsto
 {
     std::vector<std::pair<std::shared_ptr<ExpansionEntry>, UnregisterReason>> detached;
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         for (auto it = entries_.begin(); it != entries_.end();) {
             const auto &entry = it->second;
             const bool owned = entry->isOwnedBy(plugin);
@@ -436,7 +436,7 @@ std::vector<RemovedEntry> ExpansionManager::detachAll(const UnregisterReason rea
 {
     std::vector<std::shared_ptr<ExpansionEntry>> detached;
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         detached.reserve(entries_.size());
         for (auto &[identifier, entry] : entries_) {
             detached.push_back(entry);
@@ -459,7 +459,7 @@ std::vector<RemovedEntry> ExpansionManager::detachAll(const UnregisterReason rea
 
 std::shared_ptr<ExpansionEntry> ExpansionManager::findCanonical(const std::string_view canonical_identifier) const
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     const auto it = entries_.find(std::string(canonical_identifier));
     return it == entries_.end() ? nullptr : it->second;
 }
@@ -473,7 +473,7 @@ std::vector<std::shared_ptr<ExpansionEntry>> ExpansionManager::snapshotPlayerCle
 {
     std::vector<std::shared_ptr<ExpansionEntry>> snapshot;
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         for (const auto &[identifier, entry] : entries_) {
             if (entry->supportsPlayerCleanup()) {
                 snapshot.push_back(entry);
@@ -491,7 +491,7 @@ bool ExpansionManager::isRegistered(const std::string_view identifier) const
         return false;
     }
     const auto canonical = canonicalizeIdentifier(identifier);
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return entries_.contains(canonical);
 }
 
@@ -499,7 +499,7 @@ std::vector<std::string> ExpansionManager::getRegisteredIdentifiers() const
 {
     std::vector<std::string> identifiers;
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         identifiers.reserve(entries_.size());
         for (const auto &[identifier, entry] : entries_) {
             identifiers.push_back(identifier);
@@ -513,7 +513,7 @@ std::vector<ExpansionInfo> ExpansionManager::getExpansions() const
 {
     std::vector<ExpansionInfo> infos;
     {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         infos.reserve(entries_.size());
         for (const auto &[identifier, entry] : entries_) {
             infos.push_back(entry->getInfo());
@@ -526,7 +526,7 @@ std::vector<ExpansionInfo> ExpansionManager::getExpansions() const
 
 std::size_t ExpansionManager::size() const
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return entries_.size();
 }
 

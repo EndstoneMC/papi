@@ -12,7 +12,7 @@ ThrottleDecision ErrorThrottle::record(const std::uint64_t scope, const ErrorOpe
 {
     const auto index = static_cast<std::size_t>(operation);
 
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     // The clock is read under the lock because setClock may replace it.
     const auto now = clock_();
     auto &state = scopes_[scope].operations[index];
@@ -36,26 +36,26 @@ ThrottleDecision ErrorThrottle::record(const std::uint64_t scope, const ErrorOpe
 
 void ErrorThrottle::forget(const std::uint64_t scope)
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     scopes_.erase(scope);
 }
 
 void ErrorThrottle::clear()
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     scopes_.clear();
 }
 
 void ErrorThrottle::setClock(Clock clock)
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     clock_ = std::move(clock);
     scopes_.clear();
 }
 
 std::size_t ErrorThrottle::trackedScopes() const
 {
-    std::lock_guard lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return scopes_.size();
 }
 
