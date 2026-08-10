@@ -159,11 +159,11 @@ class PlaceholderAPI(Service):
         """Whether an identifier currently has an expansion registered."""
 
     @property
-    def registered_identifiers(self) -> list[str]:
+    def registered_identifiers(self) -> tuple[str, ...]:
         """Every registered identifier, sorted canonically."""
 
     @property
-    def expansions(self) -> list[ExpansionInfo]:
+    def expansions(self) -> tuple[ExpansionInfo, ...]:
         """Metadata for every registered expansion, sorted by identifier."""
 
     def register_expansion(self, owner: Plugin, expansion: PlaceholderExpansion) -> bool:

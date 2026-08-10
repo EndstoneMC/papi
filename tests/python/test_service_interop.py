@@ -102,7 +102,7 @@ def test_multiple_expansions_resolve_independently(host: _TestService) -> None:
     assert service.set_placeholders(None, "{alpha_}|{beta_}") == "A|B"
     assert service.is_registered("alpha")
     assert service.is_registered("beta")
-    assert service.registered_identifiers == ["alpha", "beta"]
+    assert service.registered_identifiers == ("alpha", "beta")
 
 
 def test_mixed_resolved_and_unresolved_in_one_pass(host: _TestService) -> None:
@@ -301,10 +301,10 @@ def test_unregister_all_clears_registry(host: _TestService) -> None:
     host.register_expansion(B())
     service = host.service
 
-    assert service.registered_identifiers == ["a", "b"]
+    assert service.registered_identifiers == ("a", "b")
     count = host.unregister_expansions()
     assert count == 2
-    assert service.registered_identifiers == []
+    assert service.registered_identifiers == ()
     assert service.set_placeholders(None, "{a_}{b_}") == "{a_}{b_}"
 
 
@@ -327,3 +327,34 @@ def test_str_subclass_return_is_contained(host: _TestService) -> None:
 
     assert service.set_placeholders(None, "[{strsub_}]") == "[{strsub_}]"
     assert any("strsub" in w and "str or None" in w for w in host.warnings), host.warnings
+
+
+def test_snapshot_collections_are_frozen_tuples(host: _TestService) -> None:
+    """registered_identifiers and expansions return immutable tuple snapshots."""
+
+    class A(PlaceholderExpansion):
+        identifier = "snap"
+        author = "t"
+        version = "1"
+
+        def on_request(self, player, params):
+            return "v"
+
+    host.register_expansion(A())
+    service = host.service
+
+    ids = service.registered_identifiers
+    infos = service.expansions
+
+    assert type(ids) is tuple
+    assert type(infos) is tuple
+    assert ids == ("snap",)
+    assert len(infos) == 1
+    assert infos[0].identifier == "snap"
+
+    # Tuples are immutable -- mutation must raise, proving the snapshot is frozen.
+    try:
+        ids[0] = "other"  # type: ignore[index]
+        raise AssertionError("tuple mutation should have raised TypeError")
+    except TypeError:
+        pass

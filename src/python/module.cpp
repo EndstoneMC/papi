@@ -254,10 +254,13 @@ PYBIND11_MODULE(_papi, m)
              "Whether text lexically contains a placeholder-shaped substring.")
         .def("is_registered", &papi::PlaceholderAPI::isRegistered, py::arg("identifier"),
              "Whether an identifier currently has an expansion registered.")
-        .def_property_readonly("registered_identifiers", &papi::PlaceholderAPI::getRegisteredIdentifiers,
-                               "Every registered identifier, sorted canonically.")
-        .def_property_readonly("expansions", &papi::PlaceholderAPI::getExpansions,
-                               "Metadata for every registered expansion, sorted by identifier.")
+        .def_property_readonly(
+            "registered_identifiers",
+            [](const papi::PlaceholderAPI &self) { return py::tuple(py::cast(self.getRegisteredIdentifiers())); },
+            "Every registered identifier, sorted canonically as a frozen tuple snapshot.")
+        .def_property_readonly(
+            "expansions", [](const papi::PlaceholderAPI &self) { return py::tuple(py::cast(self.getExpansions())); },
+            "Metadata for every registered expansion, sorted by identifier as a frozen tuple snapshot.")
         .def("register_expansion", &registerExpansionFromPython, py::arg("owner"), py::arg("expansion"),
              "Registers an expansion on behalf of a plugin.")
         .def("unregister_expansion", &papi::PlaceholderAPI::unregisterExpansion, py::arg("owner"),
