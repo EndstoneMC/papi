@@ -66,6 +66,12 @@ set_target_properties(_papi PROPERTIES
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON)
 
+# Test-only bindings let Python regression tests construct internal types directly.
+# Compiled out of release wheels, where BUILD_TESTING is OFF.
+if (NOT BUILD_TESTING STREQUAL OFF)
+    target_compile_definitions(_papi PRIVATE PAPI_TEST_BINDINGS)
+endif ()
+
 install(TARGETS _papi DESTINATION "endstone_papi" COMPONENT python)
 install(DIRECTORY include/ DESTINATION "endstone_papi/include" COMPONENT python)
 

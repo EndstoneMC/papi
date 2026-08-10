@@ -56,7 +56,9 @@ bool registerExpansionFromPython(papi::PlaceholderAPI &service, endstone::Plugin
         throw py::type_error("expansion must be a PlaceholderExpansion");
     }
 
-    // Constructed with the GIL held, which is where metadata is read and cached.
+    // Ownership-only construction: the proxy stores the handle but reads no metadata,
+    // so every Python entry point lands behind the core's canOperate gate and
+    // invokeProvider containment.
     auto proxy = std::make_shared<papi::python::GilSafeExpansionProxy>(expansion, *native);
 
     // Registration calls into the registry and may invoke the proxy, which reacquires
@@ -184,4 +186,22 @@ PYBIND11_MODULE(_papi, m)
              "Internal: builds the service and registers it with Endstone.")
         .def("stop", &PapiHost::stop, "Internal: tears the service down. Idempotent.")
         .def_property_readonly("service", &PapiHost::getService, "Internal: the published service, or None.");
+
+#ifdef PAPI_TEST_BINDINGS
+    // Test-only: lets Python regression tests construct the proxy directly so its
+    // ownership-only contract (no metadata reads in the constructor) can be verified
+    // without a running server. Compiled out of release wheels.
+    //
+    // The factory mirrors registerExpansionFromPython exactly: the native pointer is
+    // obtained via py::cast, not via the PlaceholderExpansion& type caster. Returns
+    // shared_ptr<PlaceholderExpansion> so pybind11 wraps it through the base class's
+    // smart_holder, avoiding a holder-type mismatch.
+    m.def("_test_make_proxy", [](const py::object &expansion) -> std::shared_ptr<papi::PlaceholderExpansion> {
+        auto *native = expansion.cast<papi::PlaceholderExpansion *>();
+        if (native == nullptr) {
+            throw py::type_error("expansion must be a PlaceholderExpansion");
+        }
+        return std::make_shared<papi::python::GilSafeExpansionProxy>(expansion, *native);
+    });
+#endif
 }

@@ -136,6 +136,30 @@ TEST_F(ServiceTest, EmitsOneRegisteredEventOnlyOnSuccess)
     EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 1U);
 }
 
+// T-003: a metadata exception is contained by the core's invokeProvider boundary and
+// surfaces as an atomic registration failure - no event, no partial registry state.
+TEST_F(ServiceTest, MetadataExceptionDuringRegistrationIsAtomic)
+{
+    auto expansion = std::make_shared<FakeExpansion>("demo");
+    expansion->throw_from_identifier = true;
+    EXPECT_FALSE(service_->registerExpansion(owner_, expansion));
+    EXPECT_FALSE(service_->isRegistered("demo"));
+    EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 0U);
+    EXPECT_TRUE(platform_->logger.anyContains("reading its metadata raised an error"));
+}
+
+// T-003: a preflight (canRegister) exception is contained the same way as a metadata
+// exception, because both cross the same invokeProvider boundary.
+TEST_F(ServiceTest, PreflightExceptionDuringRegistrationIsAtomic)
+{
+    auto expansion = std::make_shared<FakeExpansion>("demo");
+    expansion->throw_from_can_register = true;
+    EXPECT_FALSE(service_->registerExpansion(owner_, expansion));
+    EXPECT_FALSE(service_->isRegistered("demo"));
+    EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 0U);
+    EXPECT_TRUE(platform_->logger.anyContains("raised an error during its registration check"));
+}
+
 TEST_F(ServiceTest, EmitsUnregisteredEventAfterCleanup)
 {
     auto expansion = add("demo", owner_);

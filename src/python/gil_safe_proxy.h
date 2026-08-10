@@ -16,7 +16,7 @@ namespace papi::python {
  *
  * The registry is native and knows nothing about Python. Every crossing therefore has
  * to be mediated: this proxy acquires the GIL before touching the wrapped object,
- * converts arguments and results, contains Python exceptions, and — critically —
+ * converts arguments and results, contains Python exceptions, and - critically -
  * releases its reference to the Python object under the GIL when the registry drops
  * it.
  *
@@ -25,9 +25,13 @@ namespace papi::python {
  * coerced with str(), because silently stringifying a wrong type hides bugs in the
  * expansion.
  *
- * Metadata and capabilities are read once during construction, on the thread that
- * registers the expansion, and cached. After that the registry can answer metadata
- * questions without entering Python at all.
+ * The constructor is ownership-only: it stores the Python handle and the borrowed
+ * native pointer but never calls into Python. Metadata and capabilities are read
+ * lazily through the virtual methods, which acquire the GIL and forward to the
+ * target. This places every Python entry point - metadata, preflight, and callbacks
+ * - behind the native core's canOperate gate and invokeProvider exception boundary,
+ * so off-thread or inactive-service registration performs zero provider callbacks
+ * and a metadata exception is contained as an atomic registration failure.
  *
  * Everything native is wrapped the same way, including a native expansion that happens
  * to be handed in from Python. The extra GIL acquisition costs a little but removes an
@@ -36,27 +40,28 @@ namespace papi::python {
 class GilSafeExpansionProxy final : public PlaceholderExpansion {
 public:
     /**
-     * @brief Reads and caches the wrapped expansion's metadata.
+     * @brief Stores the wrapped expansion; performs no Python calls.
      *
      * @param handle the Python object implementing the expansion contract
      * @param expansion the same object viewed as the native contract; borrowed for
      *        construction only
      *
-     * The caller must hold the GIL. Any Python exception raised while reading metadata
-     * propagates as py::error_already_set so registration can fail cleanly.
+     * The caller must hold the GIL so the Python reference can be taken safely, but no
+     * metadata is read here. The native core reads metadata through the virtual
+     * methods, inside its own gate and exception-containment boundary.
      */
     GilSafeExpansionProxy(pybind11::object handle, PlaceholderExpansion &expansion);
 
     ~GilSafeExpansionProxy() override;
 
-    [[nodiscard]] std::string getIdentifier() const override { return identifier_; }
-    [[nodiscard]] std::string getAuthor() const override { return author_; }
-    [[nodiscard]] std::string getVersion() const override { return version_; }
-    [[nodiscard]] std::string getName() const override { return name_; }
-    [[nodiscard]] std::optional<std::string> getRequiredPlugin() const override { return required_plugin_; }
-    [[nodiscard]] bool canRegister() const override { return can_register_; }
-    [[nodiscard]] bool supportsRelationalPlaceholders() const override { return relational_; }
-    [[nodiscard]] bool supportsPlayerCleanup() const override { return player_cleanup_; }
+    [[nodiscard]] std::string getIdentifier() const override;
+    [[nodiscard]] std::string getAuthor() const override;
+    [[nodiscard]] std::string getVersion() const override;
+    [[nodiscard]] std::string getName() const override;
+    [[nodiscard]] std::optional<std::string> getRequiredPlugin() const override;
+    [[nodiscard]] bool canRegister() const override;
+    [[nodiscard]] bool supportsRelationalPlaceholders() const override;
+    [[nodiscard]] bool supportsPlayerCleanup() const override;
 
     [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
                                                        std::string_view params) override;
@@ -76,15 +81,6 @@ private:
 
     pybind11::object handle_;
     PlaceholderExpansion *target_ = nullptr;
-
-    std::string identifier_;
-    std::string author_;
-    std::string version_;
-    std::string name_;
-    std::optional<std::string> required_plugin_;
-    bool can_register_ = true;
-    bool relational_ = false;
-    bool player_cleanup_ = false;
 };
 
 }  // namespace papi::python
