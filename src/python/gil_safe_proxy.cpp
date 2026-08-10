@@ -32,6 +32,17 @@ namespace {
 }
 
 /**
+ * @brief Exact-type check for ``str`` -- rejects subclasses.
+ *
+ * The frozen contract accepts *exact* ``str`` only.  ``py::isinstance`` accepts
+ * subclasses, so we compare the type object directly.
+ */
+[[nodiscard]] bool isExactStr(const py::handle &value)
+{
+    return Py_TYPE(value.ptr()) == &PyUnicode_Type;
+}
+
+/**
  * @brief Converts a Python return value to an optional string, strictly.
  *
  * The caller must hold the GIL.
@@ -44,7 +55,7 @@ namespace {
     if (value.is_none()) {
         return std::nullopt;
     }
-    if (!py::isinstance<py::str>(value)) {
+    if (!isExactStr(value)) {
         // Deliberately not coerced with str(): a wrong type is a provider bug, and
         // quietly stringifying it would hide the mistake.
         error = "expected str or None, got " + py::str(py::type::handle_of(value)).cast<std::string>();

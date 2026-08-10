@@ -107,6 +107,17 @@ private:
 }
 
 /**
+ * @brief Exact-type check for ``str`` -- rejects subclasses.
+ *
+ * The frozen contract accepts *exact* ``str`` only, not subclasses.  ``py::isinstance``
+ * accepts subclasses, so we compare the type object directly.
+ */
+[[nodiscard]] bool isExactStr(const py::handle &value)
+{
+    return Py_TYPE(value.ptr()) == &PyUnicode_Type;
+}
+
+/**
  * @brief Interprets what a Python override returned as an optional value.
  *
  * The caller must hold the GIL.
@@ -119,7 +130,7 @@ private:
     if (value.is_none()) {
         return std::nullopt;
     }
-    if (!py::isinstance<py::str>(value)) {
+    if (!isExactStr(value)) {
         throw std::runtime_error(std::string(method) + " must return str or None, got " +
                                  py::str(py::type::handle_of(value)).cast<std::string>());
     }
@@ -138,7 +149,7 @@ private:
     if (!value) {
         throw std::runtime_error(std::string("expansion must define '") + name + "'");
     }
-    if (!py::isinstance<py::str>(value)) {
+    if (!isExactStr(value)) {
         throw std::runtime_error(std::string("expansion property '") + name + "' must be str, got " +
                                  py::str(py::type::handle_of(value)).cast<std::string>());
     }
@@ -220,7 +231,7 @@ std::string PyPlaceholderExpansion::getName() const
         // No override, or an explicit None: fall back to the identifier.
         return requiredString(self, "identifier");
     }
-    if (!py::isinstance<py::str>(value)) {
+    if (!isExactStr(value)) {
         throw std::runtime_error("expansion property 'name' must be str or None, got " +
                                  py::str(py::type::handle_of(value)).cast<std::string>());
     }
@@ -239,7 +250,7 @@ std::optional<std::string> PyPlaceholderExpansion::getRequiredPlugin() const
     if (!value || value.is_none()) {
         return std::nullopt;
     }
-    if (!py::isinstance<py::str>(value)) {
+    if (!isExactStr(value)) {
         throw std::runtime_error("expansion property 'required_plugin' must be str or None, got " +
                                  py::str(py::type::handle_of(value)).cast<std::string>());
     }

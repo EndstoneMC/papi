@@ -306,3 +306,24 @@ def test_unregister_all_clears_registry(host: _TestService) -> None:
     assert count == 2
     assert service.registered_identifiers == []
     assert service.set_placeholders(None, "{a_}{b_}") == "{a_}{b_}"
+
+
+def test_str_subclass_return_is_contained(host: _TestService) -> None:
+    """A str subclass return violates the exact-str contract and is contained."""
+
+    class S(str):
+        pass
+
+    class StrSubclassReturn(PlaceholderExpansion):
+        identifier = "strsub"
+        author = "t"
+        version = "1"
+
+        def on_request(self, player, params):
+            return S("value")
+
+    host.register_expansion(StrSubclassReturn())
+    service = host.service
+
+    assert service.set_placeholders(None, "[{strsub_}]") == "[{strsub_}]"
+    assert any("strsub" in w and "str or None" in w for w in host.warnings), host.warnings
