@@ -79,7 +79,7 @@ before-all = [
     "dnf install -y clang cmake ninja-build python3-pip wget xz",
     "wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/llvm-project-17.0.6.src.tar.xz -O /tmp/llvm.tar.xz",
     "tar xf /tmp/llvm.tar.xz -C /tmp",
-    "cmake -B /tmp/libcxx-build -S /tmp/llvm-project-17.0.6.src/runtimes -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi' -DLIBCXX_CXX_ABI=libc++abi -DLIBCXXABI_USE_LLVM_UNWINDER=OFF",
+    "cmake -B /tmp/libcxx-build -S /tmp/llvm-project-17.0.6.src/runtimes -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi' -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=OFF",
     "cmake --build /tmp/libcxx-build --target cxx cxxabi -- -j$(nproc)",
     "cmake --install /tmp/libcxx-build",
     "rm -rf /tmp/llvm.tar.xz /tmp/llvm-project-17.0.6.src /tmp/libcxx-build",
