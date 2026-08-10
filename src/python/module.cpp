@@ -142,6 +142,13 @@ public:
         return registerExpansionFromPython(*service_, *plugin_, expansion);
     }
 
+    bool unregisterExpansion(std::string_view identifier)
+    {
+        return service_->unregisterExpansion(*plugin_, identifier);
+    }
+
+    std::size_t unregisterExpansions() { return service_->unregisterExpansions(*plugin_); }
+
     [[nodiscard]] std::vector<std::string> warningMessages() const
     {
         std::vector<std::string> result;
@@ -304,6 +311,10 @@ PYBIND11_MODULE(_papi, m)
         .def_property_readonly("service", &TestService::service, "The native PlaceholderAPI service.")
         .def("register_expansion", &TestService::registerExpansion, py::arg("expansion"),
              "Registers a Python expansion through the GIL-safe proxy path.")
+        .def("unregister_expansion", &TestService::unregisterExpansion, py::arg("identifier"),
+             "Unregisters one expansion owned by the test plugin.")
+        .def("unregister_expansions", &TestService::unregisterExpansions,
+             "Unregisters every expansion owned by the test plugin.")
         .def_property_readonly("warnings", &TestService::warningMessages,
                                "Every warning-or-above message logged by the service.");
 #endif
