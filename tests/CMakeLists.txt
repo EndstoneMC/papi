@@ -27,8 +27,12 @@ gtest_discover_tests(papi_test
         PROPERTIES TIMEOUT 120
 )
 
-file(GLOB PAPI_PUBLIC_HEADERS RELATIVE "${PROJECT_SOURCE_DIR}/include/endstone_papi"
+file(GLOB PAPI_STATIC_HEADERS RELATIVE "${PROJECT_SOURCE_DIR}/include/endstone_papi"
         "${PROJECT_SOURCE_DIR}/include/endstone_papi/*.h")
+file(GLOB PAPI_GENERATED_HEADERS RELATIVE "${PROJECT_BINARY_DIR}/generated/include/endstone_papi"
+        "${PROJECT_BINARY_DIR}/generated/include/endstone_papi/*.h")
+set(PAPI_PUBLIC_HEADERS ${PAPI_STATIC_HEADERS} ${PAPI_GENERATED_HEADERS})
+list(REMOVE_DUPLICATES PAPI_PUBLIC_HEADERS)
 
 set(PAPI_HEADER_TU_SOURCES "")
 foreach (header IN LISTS PAPI_PUBLIC_HEADERS)

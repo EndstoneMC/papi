@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.29)
 
 project(papi VERSION 1.0.0 LANGUAGES CXX)
 
+# Generate the public version header from the CMake project version so that
+# getVersion() is header-only and CMakeLists.txt is the single version source.
+configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/include/endstone_papi/version.h
+        @ONLY)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -45,6 +52,7 @@ add_library(endstone_papi INTERFACE)
 add_library(endstone_papi::endstone_papi ALIAS endstone_papi)
 target_include_directories(endstone_papi INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated/include>
         $<INSTALL_INTERFACE:include>)
 target_link_libraries(endstone_papi INTERFACE endstone::endstone)
 target_compile_features(endstone_papi INTERFACE cxx_std_20)
@@ -74,6 +82,7 @@ endif ()
 
 install(TARGETS _papi DESTINATION "endstone_papi" COMPONENT python)
 install(DIRECTORY include/ DESTINATION "endstone_papi/include" COMPONENT python)
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated/include/ DESTINATION "endstone_papi/include" COMPONENT python)
 
 if (NOT BUILD_TESTING STREQUAL OFF)
     enable_testing()
@@ -84,6 +93,7 @@ add_subdirectory(examples/cpp)
 
 # Formats only repository-owned C++ sources; never fetched dependencies.
 file(GLOB_RECURSE PAPI_FORMAT_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/*.h.in"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"

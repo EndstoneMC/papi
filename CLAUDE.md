@@ -151,7 +151,6 @@ src/
     diagnostics/         # Error throttling
     platform.h           # Abstract platform interface
     deprecation.h        # Deprecation suppression macros
-    version.cpp          # Build version string
   platform/
     endstone/            # Endstone-specific adapters
       bootstrap.cpp      # Service lifecycle: create, register, shut down
@@ -371,9 +370,10 @@ it with manual version commits, tags, or GitHub Releases.
 
 1. Finish all release changes as focused commits on `develop`.
 2. Keep release notes under `## [Unreleased]` in `CHANGELOG.md`.
-3. Keep the current released version unchanged in `CMakeLists.txt` and
-   `src/core/version.cpp`. The wheel version in `pyproject.toml` is derived
-   dynamically from `CMakeLists.txt` via the scikit-build regex metadata provider.
+3. Keep the current released version unchanged in `CMakeLists.txt`.
+   The wheel version in `pyproject.toml` is derived dynamically from
+   `CMakeLists.txt` via the scikit-build regex metadata provider, and the
+   C++ `getVersion()` is generated from `cmake/version.h.in` at configure time.
 4. Run tests, build, and the self-test.
 5. Push `develop` to `personal/develop` and wait for CI to pass.
 
