@@ -97,13 +97,12 @@ jobs:
           echo "Tag: v$VERSION"
           echo "Date: $DATE"
           echo
-          echo "=== Current versions ==="
+          echo "=== Current CMake version ==="
           grep -F 'project(papi VERSION ' CMakeLists.txt
-          grep -F 'version = ' pyproject.toml | head -1
           echo
-          echo "=== Versions after update ==="
+          echo "=== CMake version after update ==="
           echo "project(papi VERSION $VERSION LANGUAGES CXX)"
-          echo "version = \"$VERSION\""
+          echo "(pyproject.toml version is derived dynamically from CMakeLists.txt)"
           echo
           echo "=== Changelog changes ==="
           diff -u CHANGELOG.md /tmp/CHANGELOG.md || true
@@ -116,7 +115,6 @@ jobs:
         shell: bash
         run: |
           sed -E -i "s/^project\(papi VERSION [0-9]+\.[0-9]+\.[0-9]+ LANGUAGES CXX\)$/project(papi VERSION $VERSION LANGUAGES CXX)/" CMakeLists.txt
-          sed -E -i "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+(\.[a-z0-9]+)?\"$/version = \"$VERSION\"/" pyproject.toml
           cp /tmp/CHANGELOG.md CHANGELOG.md
 
       - name: Verify versions
@@ -124,7 +122,6 @@ jobs:
         shell: bash
         run: |
           grep -Fx "project(papi VERSION $VERSION LANGUAGES CXX)" CMakeLists.txt
-          grep -Fx "version = \"$VERSION\"" pyproject.toml
           test "$(grep -Fc "## [$VERSION]" CHANGELOG.md)" -eq 1
           test -s /tmp/release_body.md
           git diff --check
@@ -136,7 +133,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CMakeLists.txt pyproject.toml CHANGELOG.md
+          git add CMakeLists.txt CHANGELOG.md
           git commit -m "chore: release v$VERSION"
           # Push the release commit to main and develop now so the build jobs can
           # check it out. The tag is created only after all artifacts are validated
