@@ -82,15 +82,41 @@ public:
     PAPI_SUPPRESS_DEPRECATED_END
 
     /**
-     * @brief Tears the service down, permanently.
+     * @brief Transitions the service out of Active so nothing new can start.
      *
-     * Transitions out of Active first so nothing new can start, then removes every
-     * entry, runs each expansion's cleanup exactly once, releases every provider
-     * object, and drops all platform references. Idempotent: calling it again does
-     * nothing and re-runs no callback.
+     * Atomically marks the service Stopping: isActive returns false, parsing
+     * returns input unchanged, and mutations are refused.  The registry is *not*
+     * drained yet -- this is the window where the bootstrap unregisters the named
+     * service from the ServiceManager so shutdown callbacks cannot rediscover PAPI
+     * as a still-published service.
+     *
+     * Idempotent.  Returns true only for the caller that performed the transition.
+     *
+     * @see finishShutdown
+     */
+    bool beginShutdown();
+
+    /**
+     * @brief Drains the registry and completes the transition to Inactive.
+     *
+     * Removes every entry, runs each expansion's onUnregister(PapiShutdown) cleanup
+     * exactly once, releases every provider object, and clears the throttle.  Safe
+     * to call only after beginShutdown; if the service is not Stopping this is a
+     * no-op.  Idempotent.
      *
      * Must be called while the interpreter and provider modules are still loaded,
      * which in practice means from PAPI's own onDisable.
+     *
+     * @see beginShutdown
+     */
+    void finishShutdown();
+
+    /**
+     * @brief Convenience: beginShutdown followed by finishShutdown.
+     *
+     * Equivalent to calling beginShutdown then finishShutdown.  Idempotent.
+     * Provided for the destructor and for callers that do not need to interleave
+     * ServiceManager unregistration between the two phases.
      */
     void shutdown();
 

@@ -420,6 +420,45 @@ TEST_F(ServiceTest, ShutdownIsIdempotent)
     EXPECT_FALSE(service_->isActive());
 }
 
+// T-023 (A-007): shutdown must be split so the bootstrap can unregister the
+// named service from the ServiceManager *between* transitioning non-operational
+// and draining the registry.  The onUnregister(PapiShutdown) callback must not
+// see the service as Active, and the registry must still be populated after
+// beginShutdown so the bootstrap has a window to unpublish.
+TEST_F(ServiceTest, ShutdownSplitLeavesServiceNonOperationalBeforeDraining)
+{
+    auto expansion = add("demo", owner_);
+
+    // Phase 1: transition non-operational without draining the registry.
+    // Query methods are gated on isActive(), so they return false/empty once
+    // the state leaves Active; the registry population is observed indirectly
+    // through the onUnregister callback count instead.
+    EXPECT_TRUE(service_->beginShutdown());
+    EXPECT_FALSE(service_->isActive());
+    EXPECT_EQ(expansion->unregister_calls, 0);
+
+    // A second beginShutdown is a no-op (idempotent transition).
+    EXPECT_FALSE(service_->beginShutdown());
+
+    // Phase 2: drain.  The callback must see the service as non-operational.
+    bool callback_saw_active = true;
+    expansion->on_unregister = [&](UnregisterReason) {
+        callback_saw_active = service_->isActive();
+    };
+
+    service_->finishShutdown();
+
+    EXPECT_EQ(expansion->unregister_calls, 1);
+    EXPECT_EQ(expansion->last_unregister_reason, UnregisterReason::PapiShutdown);
+    EXPECT_FALSE(callback_saw_active);
+    EXPECT_FALSE(service_->isActive());
+    EXPECT_FALSE(service_->isRegistered("demo"));
+
+    // finishShutdown is idempotent: a second call re-runs no callback.
+    service_->finishShutdown();
+    EXPECT_EQ(expansion->unregister_calls, 1);
+}
+
 // OWN-002
 TEST_F(ServiceTest, OwnerDisableRemovesOnlyThatOwnersExpansions)
 {

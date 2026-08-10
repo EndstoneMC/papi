@@ -635,12 +635,21 @@ void PlaceholderApiImpl::dispatchLifecycleEvent(endstone::Event &event) const
     }
 }
 
-void PlaceholderApiImpl::shutdown()
+bool PlaceholderApiImpl::beginShutdown()
 {
-    // Only the caller that wins this transition performs teardown, so a second call
-    // is harmless and no cleanup callback runs twice.
+    // Only the caller that wins this transition marks the service Stopping.  The
+    // registry is not drained here -- the bootstrap unregisters the named service
+    // from the ServiceManager between beginShutdown and finishShutdown so shutdown
+    // callbacks cannot rediscover PAPI as a still-published service.
     auto expected = ServiceState::Active;
-    if (!state_.compare_exchange_strong(expected, ServiceState::Stopping, std::memory_order_acq_rel)) {
+    return state_.compare_exchange_strong(expected, ServiceState::Stopping, std::memory_order_acq_rel);
+}
+
+void PlaceholderApiImpl::finishShutdown()
+{
+    // Only the Stopping state performs teardown.  Active has not begun shutdown,
+    // and Inactive has already completed it.
+    if (state_.load(std::memory_order_acquire) != ServiceState::Stopping) {
         return;
     }
 
@@ -655,6 +664,12 @@ void PlaceholderApiImpl::shutdown()
     // torn down at the same time, so firing them would be unpredictable.
     throttle_.clear();
     state_.store(ServiceState::Inactive, std::memory_order_release);
+}
+
+void PlaceholderApiImpl::shutdown()
+{
+    beginShutdown();
+    finishShutdown();
 }
 
 }  // namespace papi::detail

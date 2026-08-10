@@ -54,10 +54,15 @@ void PapiBootstrap::stop()
         return;
     }
 
-    // Order matters. The service goes inert and releases every provider object while
-    // the owning modules and the interpreter are still loaded; only afterwards are
-    // the platform references dropped.
-    service_->shutdown();
+    // Order matters (T-023 / A-007). The frozen lifecycle requires:
+    //   1. Transition the service non-operational (Stopping) so nothing new can
+    //      start and isActive returns false.
+    //   2. Unregister the named service from the ServiceManager so shutdown
+    //      callbacks cannot rediscover PAPI as a still-published service.
+    //   3. Drain the registry: run onUnregister(PapiShutdown), release every
+    //      provider object while the owning modules are still loaded.
+    //   4. Drop platform references.
+    service_->beginShutdown();
 
     if (plugin_) {
         plugin_->getServer().getServiceManager().unregister(std::string(PlaceholderAPI::ServiceName), *service_);
@@ -65,6 +70,8 @@ void PapiBootstrap::stop()
         // holds nothing owned by this plugin.
         plugin_->getServer().getServiceManager().unregisterAll(*plugin_);
     }
+
+    service_->finishShutdown();
 
     if (platform_) {
         platform_->detach();
