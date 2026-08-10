@@ -429,7 +429,7 @@ bool PlaceholderApiImpl::registerExpansion(endstone::Plugin &owner, std::shared_
     }
 
     ExpansionRegisteredEvent event{result.info};
-    platform().callEvent(event);
+    dispatchLifecycleEvent(event);
     return true;
 }
 
@@ -553,7 +553,7 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
 
         if (reason != UnregisterReason::PapiShutdown) {
             ExpansionUnregisteredEvent event{info, reason};
-            platform().callEvent(event);
+            dispatchLifecycleEvent(event);
         }
     };
 
@@ -598,6 +598,37 @@ void PlaceholderApiImpl::logReentrancyError(const ExpansionInfo &info, const std
         text += " (" + std::to_string(decision.suppressed) + " similar messages suppressed)";
     }
     platform().log(endstone::Logger::Warning, text);
+}
+
+void PlaceholderApiImpl::dispatchLifecycleEvent(endstone::Event &event) const
+{
+    try {
+        platform().callEvent(event);
+    }
+    catch (const std::exception &e) {
+        const auto decision = throttle_.record(ServiceErrorScope, ErrorOperation::EventDispatch);
+        if (!decision.should_log) {
+            return;
+        }
+        std::string text =
+            "PlaceholderAPI: a listener threw during " + std::string(event.getEventName()) + " dispatch: " + e.what();
+        if (decision.suppressed > 0) {
+            text += " (" + std::to_string(decision.suppressed) + " similar messages suppressed)";
+        }
+        platform().log(endstone::Logger::Warning, text);
+    }
+    catch (...) {
+        const auto decision = throttle_.record(ServiceErrorScope, ErrorOperation::EventDispatch);
+        if (!decision.should_log) {
+            return;
+        }
+        std::string text = "PlaceholderAPI: a listener threw an unknown C++ exception during " +
+                           std::string(event.getEventName()) + " dispatch";
+        if (decision.suppressed > 0) {
+            text += " (" + std::to_string(decision.suppressed) + " similar messages suppressed)";
+        }
+        platform().log(endstone::Logger::Warning, text);
+    }
 }
 
 void PlaceholderApiImpl::shutdown()

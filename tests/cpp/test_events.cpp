@@ -1,5 +1,7 @@
 // Command and event ordering: EVT-001 through EVT-005.
 
+#include <stdexcept>
+
 #include <gtest/gtest.h>
 
 #include "core/service/placeholder_api_impl.h"
@@ -96,6 +98,36 @@ TEST_F(EventsTest, ThrowingCleanupDoesNotStopTheUnregisteredEvent)
     ASSERT_EQ(platform_->events.size(), 1U);
     EXPECT_EQ(platform_->events[0].name, "ExpansionUnregisteredEvent");
     EXPECT_EQ(platform_->events[0].reason, papi::UnregisterReason::Explicit);
+}
+
+// T-012: an unknown C++ exception thrown by a listener during callEvent must not
+// escape into the caller. Both std::exception and non-std throws are contained.
+TEST_F(EventsTest, ThrowingListenerDoesNotEscapeFromRegisteredEvent)
+{
+    platform_->on_event = [](const papi::testing::RecordedEvent &) {
+        throw std::runtime_error("listener boom");
+    };
+
+    auto expansion = std::make_shared<FakeExpansion>("demo");
+    EXPECT_NO_THROW(service_->registerExpansion(owner_, expansion));
+    EXPECT_TRUE(service_->isRegistered("demo"));
+    EXPECT_TRUE(platform_->logger.anyContains("listener threw"));
+}
+
+TEST_F(EventsTest, ThrowingListenerDoesNotEscapeFromUnregisteredEvent)
+{
+    auto expansion = std::make_shared<FakeExpansion>("demo");
+    ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
+    platform_->events.clear();
+
+    // Throw a non-std exception from the unregister event to exercise the catch-all.
+    platform_->on_event = [](const papi::testing::RecordedEvent &) {
+        throw 42;
+    };
+
+    EXPECT_NO_THROW(service_->unregisterExpansion(owner_, "demo"));
+    EXPECT_FALSE(service_->isRegistered("demo"));
+    EXPECT_TRUE(platform_->logger.anyContains("unknown C++ exception"));
 }
 
 // EVT-002: a failed registration emits no event.

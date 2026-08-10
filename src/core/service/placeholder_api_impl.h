@@ -145,6 +145,15 @@ private:
      */
     void logReentrancyError(const ExpansionInfo &info, std::uint64_t generation, std::string_view reason) const;
 
+    /**
+     * @brief Dispatches a PAPI-owned lifecycle event, containing listener exceptions.
+     *
+     * A listener is third-party code; an unknown C++ exception thrown from callEvent
+     * must not escape into Endstone's command, event, or service dispatch. Failures
+     * are logged as throttled provider-style diagnostics.
+     */
+    void dispatchLifecycleEvent(endstone::Event &event) const;
+
     Platform &platform() const noexcept { return *platform_; }
 
     std::shared_ptr<Platform> platform_;
