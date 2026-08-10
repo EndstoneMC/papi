@@ -36,6 +36,8 @@ class PapiRecipe(ConanFile):
         self.requires("expected-lite/0.9.0")
         # Endstone 0.11 builds its bindings against pybind11 3.x; the expansion
         # trampoline needs py::smart_holder and py::trampoline_self_life_support.
+        # Pinned to 3.0.1 to match the PEP 517 pybind11==3.0.1 in pyproject.toml;
+        # the Conan package provides the CMake headers (find_package(pybind11)).
         self.requires("pybind11/3.0.1")
 
     def build_requirements(self):
