@@ -160,6 +160,70 @@ TEST_F(ServiceTest, PreflightExceptionDuringRegistrationIsAtomic)
     EXPECT_TRUE(platform_->logger.anyContains("raised an error during its registration check"));
 }
 
+// T-005: a self-parse cycle (expansion A resolves a placeholder by calling
+// setPlaceholders("{a_x}")) is bounded by the active-expansion cycle detector.
+// The original token is preserved and a throttled diagnostic is logged.
+TEST_F(ServiceTest, SelfParseCycleIsBounded)
+{
+    auto expansion = std::make_shared<FakeExpansion>("a");
+    expansion->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
+        return service_->setPlaceholders(nullptr, "{a_x}");
+    };
+    ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
+
+    const auto result = service_->setPlaceholders(nullptr, "{a_x}");
+    EXPECT_EQ(result, "{a_x}");
+    EXPECT_GT(expansion->request_calls, 0);
+    EXPECT_TRUE(platform_->logger.anyContains("cycle detected"));
+}
+
+// T-005: an indirect cycle (A -> B -> A) is bounded the same way. B resolves normally
+// on the first pass; when B's callback re-enters A, the cycle is detected.
+TEST_F(ServiceTest, IndirectParseCycleIsBounded)
+{
+    auto a = std::make_shared<FakeExpansion>("a");
+    auto b = std::make_shared<FakeExpansion>("b");
+    a->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
+        return service_->setPlaceholders(nullptr, "{b_y}");
+    };
+    b->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
+        return service_->setPlaceholders(nullptr, "{a_x}");
+    };
+    ASSERT_TRUE(service_->registerExpansion(owner_, a));
+    ASSERT_TRUE(service_->registerExpansion(owner_, b));
+
+    const auto result = service_->setPlaceholders(nullptr, "{a_x}");
+    // The cycle preserves the original token at the deepest level, so the chain
+    // unwinds with "{a_x}" as the replacement text.
+    EXPECT_EQ(result, "{a_x}");
+    EXPECT_TRUE(platform_->logger.anyContains("cycle detected"));
+}
+
+// T-005: a deep but non-cyclic chain that exceeds the depth budget is bounded.
+// The budget violation preserves the input text unchanged.
+TEST_F(ServiceTest, ParseDepthBudgetIsEnforced)
+{
+    // Register expansions that form a long chain without a cycle: each calls the
+    // next. The chain is longer than ParseDepthBudget, so the budget is hit.
+    constexpr int chain_length = 12;
+    std::vector<std::shared_ptr<FakeExpansion>> chain;
+    for (int i = 0; i < chain_length; ++i) {
+        auto exp = std::make_shared<FakeExpansion>("e" + std::to_string(i));
+        const auto next_token = (i + 1 < chain_length) ? "{e" + std::to_string(i + 1) + "_x}" : "leaf";
+        exp->on_request = [&, next_token](const endstone::OfflinePlayer *, std::string_view) {
+            return service_->setPlaceholders(nullptr, next_token);
+        };
+        ASSERT_TRUE(service_->registerExpansion(owner_, exp));
+        chain.push_back(exp);
+    }
+
+    // The chain is deeper than the budget; the original token is preserved at the
+    // level where the budget is exceeded.
+    const auto result = service_->setPlaceholders(nullptr, "{e0_x}");
+    EXPECT_FALSE(result.empty());
+    EXPECT_TRUE(platform_->logger.anyContains("parse depth budget exceeded"));
+}
+
 TEST_F(ServiceTest, EmitsUnregisteredEventAfterCleanup)
 {
     auto expansion = add("demo", owner_);

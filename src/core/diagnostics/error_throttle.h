@@ -22,6 +22,7 @@ enum class ErrorOperation : std::uint8_t {
     PlayerCleanup = 4,
     Unregister = 5,
     ThreadPolicy = 6,
+    ParseReentrancy = 7,
 };
 
 [[nodiscard]] constexpr std::string_view toString(const ErrorOperation operation) noexcept
@@ -41,6 +42,8 @@ enum class ErrorOperation : std::uint8_t {
         return "unregister";
     case ErrorOperation::ThreadPolicy:
         return "thread_policy";
+    case ErrorOperation::ParseReentrancy:
+        return "parse_reentrancy";
     }
     return "unknown";
 }
@@ -48,7 +51,7 @@ enum class ErrorOperation : std::uint8_t {
 /**
  * @brief The number of operations tracked per throttle scope.
  */
-inline constexpr std::size_t ErrorOperationCount = 7;
+inline constexpr std::size_t ErrorOperationCount = 8;
 
 /**
  * @brief How long repeats of the same failure stay suppressed.

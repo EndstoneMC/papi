@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <unordered_set>
 #include <utility>
 
 #include "endstone_papi/events.h"
@@ -18,6 +19,94 @@ namespace {
  * Kept verbatim for source compatibility. It is not used for parsing or validation.
  */
 constexpr std::string_view LegacyPlaceholderPattern = "[{]([^{}]+)[}]";
+
+/**
+ * @brief Maximum nesting depth for reentrant parsing.
+ *
+ * A provider callback can call setPlaceholders again, forming a chain. C++ has no
+ * language-level recursion limit, so without this budget a cycle or a deep chain
+ * exhausts the native stack. Eight is generous for legitimate indirect resolution
+ * while keeping the worst-case stack depth bounded.
+ */
+inline constexpr unsigned ParseDepthBudget = 8;
+
+/**
+ * @brief Thread-local nesting depth for reentrant parse calls.
+ *
+ * Zero at the top level, incremented by ParseDepthGuard on entry to
+ * setPlaceholders/setRelationalPlaceholders, decremented on exit.
+ */
+unsigned &parseDepth()
+{
+    thread_local unsigned depth = 0;
+    return depth;
+}
+
+/**
+ * @brief Thread-local set of expansion generations currently being resolved.
+ *
+ * Used to detect cycles (A -> B -> A) before the depth budget is reached. A
+ * generation is process-unique, so it cannot collide between different
+ * registrations across services.
+ */
+std::unordered_set<std::uint64_t> &activeGenerations()
+{
+    thread_local std::unordered_set<std::uint64_t> generations;
+    return generations;
+}
+
+/**
+ * @brief RAII guard that increments the parse depth on construction and
+ *        decrements it on destruction, even if an exception propagates.
+ */
+class ParseDepthGuard {
+public:
+    ParseDepthGuard() { ++parseDepth(); }
+
+    ~ParseDepthGuard() { --parseDepth(); }
+
+    ParseDepthGuard(const ParseDepthGuard &) = delete;
+    ParseDepthGuard &operator=(const ParseDepthGuard &) = delete;
+
+    [[nodiscard]] static bool budgetExceeded() { return parseDepth() > ParseDepthBudget; }
+};
+
+/**
+ * @brief RAII guard that tracks an expansion generation as active during
+ *        resolution, so reentrant resolution of the same generation is detected
+ *        as a cycle.
+ *
+ * On construction, checks whether the generation is already active. If so,
+ * reEntered() returns true and the caller must skip the provider call. Otherwise
+ * the generation is inserted and removed on destruction.
+ */
+class ActiveExpansionGuard {
+public:
+    explicit ActiveExpansionGuard(std::uint64_t generation) : generation_(generation)
+    {
+        auto &active = activeGenerations();
+        if (!active.contains(generation)) {
+            active.insert(generation);
+            pushed_ = true;
+        }
+    }
+
+    ~ActiveExpansionGuard()
+    {
+        if (pushed_) {
+            activeGenerations().erase(generation_);
+        }
+    }
+
+    ActiveExpansionGuard(const ActiveExpansionGuard &) = delete;
+    ActiveExpansionGuard &operator=(const ActiveExpansionGuard &) = delete;
+
+    [[nodiscard]] bool reEntered() const noexcept { return !pushed_; }
+
+private:
+    std::uint64_t generation_;
+    bool pushed_ = false;
+};
 
 /**
  * @brief Calls provider code and reports failure instead of propagating it.
@@ -117,11 +206,20 @@ public:
             return std::nullopt;
         }
 
+        const auto generation = lease.getEntry()->getGeneration();
+        const ActiveExpansionGuard cycle_guard{generation};
+        if (cycle_guard.reEntered()) {
+            // This expansion is already being resolved higher on the call stack:
+            // a provider callback re-entered parsing and reached itself, directly
+            // or through another expansion. Preserve the original token.
+            service_.logReentrancyError(lease.getEntry()->getInfo(), generation, "cycle detected");
+            return std::nullopt;
+        }
+
         std::optional<std::string> value;
         std::string error_message;
         if (!invokeProvider([&] { value = expansion->onRequest(player_, params); }, error_message)) {
-            service_.logProviderError(lease.getEntry()->getInfo(), lease.getEntry()->getGeneration(),
-                                      ErrorOperation::Ordinary, error_message);
+            service_.logProviderError(lease.getEntry()->getInfo(), generation, ErrorOperation::Ordinary, error_message);
             return std::nullopt;
         }
 
@@ -184,12 +282,18 @@ public:
             return std::nullopt;
         }
 
+        const auto generation = entry->getGeneration();
+        const ActiveExpansionGuard cycle_guard{generation};
+        if (cycle_guard.reEntered()) {
+            service_.logReentrancyError(entry->getInfo(), generation, "relational cycle detected");
+            return std::nullopt;
+        }
+
         std::optional<std::string> value;
         std::string error_message;
         if (!invokeProvider([&] { value = expansion->onRelationalRequest(one_, two_, relational_params); },
                             error_message)) {
-            service_.logProviderError(entry->getInfo(), entry->getGeneration(), ErrorOperation::Relational,
-                                      error_message);
+            service_.logProviderError(entry->getInfo(), generation, ErrorOperation::Relational, error_message);
             return std::nullopt;
         }
 
@@ -256,6 +360,13 @@ std::string PlaceholderApiImpl::setPlaceholders(const endstone::OfflinePlayer *p
     if (!canOperate(ErrorOperation::ThreadPolicy, "parsing placeholders")) {
         return std::string(text);
     }
+    const ParseDepthGuard depth_guard;
+    if (ParseDepthGuard::budgetExceeded()) {
+        // A provider callback re-entered parsing too deeply. Preserve the input
+        // rather than risking stack exhaustion.
+        logReentrancyError({}, 0, "parse depth budget exceeded");
+        return std::string(text);
+    }
     OrdinaryResolver resolver{*this, player};
     return replacePlaceholders(text, resolver);
 }
@@ -264,6 +375,11 @@ std::string PlaceholderApiImpl::setRelationalPlaceholders(const endstone::Player
                                                           const std::string_view text) const
 {
     if (!canOperate(ErrorOperation::ThreadPolicy, "parsing relational placeholders")) {
+        return std::string(text);
+    }
+    const ParseDepthGuard depth_guard;
+    if (ParseDepthGuard::budgetExceeded()) {
+        logReentrancyError({}, 0, "relational parse depth budget exceeded");
         return std::string(text);
     }
     RelationalResolver resolver{*this, one, two};
@@ -462,6 +578,27 @@ void PlaceholderApiImpl::logProviderError(const ExpansionInfo &info, const std::
         text += " (" + std::to_string(decision.suppressed) + " similar messages suppressed)";
     }
     platform().log(endstone::Logger::Error, text);
+}
+
+void PlaceholderApiImpl::logReentrancyError(const ExpansionInfo &info, const std::uint64_t generation,
+                                            const std::string_view reason) const
+{
+    // Depth-budget violations are service-wide (generation 0); cycles are per-entry.
+    const auto scope = generation == 0 ? ServiceErrorScope : generation;
+    const auto decision = throttle_.record(scope, ErrorOperation::ParseReentrancy);
+    if (!decision.should_log) {
+        return;
+    }
+
+    std::string text = "PlaceholderAPI: " + std::string(reason);
+    if (!info.identifier.empty()) {
+        text += " for expansion '" + info.identifier + "' from plugin '" + info.owner + "'";
+    }
+    text += "; the original placeholder was preserved";
+    if (decision.suppressed > 0) {
+        text += " (" + std::to_string(decision.suppressed) + " similar messages suppressed)";
+    }
+    platform().log(endstone::Logger::Warning, text);
 }
 
 void PlaceholderApiImpl::shutdown()

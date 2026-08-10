@@ -136,6 +136,15 @@ private:
     void logProviderError(const ExpansionInfo &info, std::uint64_t generation, ErrorOperation operation,
                           std::string_view message) const;
 
+    /**
+     * @brief Reports a bounded reentrancy violation (cycle or depth budget).
+     *
+     * Throttled per scope: service-wide for depth-budget violations (generation 0),
+     * per-entry for cycles. The original placeholder is always preserved, so this
+     * is a diagnostic, not a fatal error.
+     */
+    void logReentrancyError(const ExpansionInfo &info, std::uint64_t generation, std::string_view reason) const;
+
     Platform &platform() const noexcept { return *platform_; }
 
     std::shared_ptr<Platform> platform_;

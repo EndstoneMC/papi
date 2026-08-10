@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include <endstone/plugin/plugin_description.h>
 #include <pybind11/native_enum.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -67,6 +68,97 @@ bool registerExpansionFromPython(papi::PlaceholderAPI &service, endstone::Plugin
     const py::gil_scoped_release release;
     return service.registerExpansion(owner, std::move(proxy));
 }
+
+#ifdef PAPI_TEST_BINDINGS
+/**
+ * @brief In-memory Platform for Python regression tests, mirroring FakePlatform.
+ *
+ * Reports the calling thread as primary and every plugin as enabled, records log
+ * messages so tests can assert on reentrancy diagnostics, and no-ops event dispatch.
+ */
+class TestPlatform final : public papi::detail::Platform {
+public:
+    [[nodiscard]] bool isPrimaryThread() const override { return true; }
+    [[nodiscard]] bool isPluginEnabled(std::string_view /*name*/) const override { return true; }
+    [[nodiscard]] bool isPluginEnabled(const endstone::Plugin & /*plugin*/) const override { return true; }
+    [[nodiscard]] const endstone::Player *getOnlinePlayer(endstone::UUID /*id*/) const override { return nullptr; }
+
+    void log(const endstone::Logger::Level level, std::string_view message) override
+    {
+        records.push_back({level, std::string(message)});
+    }
+
+    void callEvent(endstone::Event & /*event*/) override {}
+
+    struct LogRecord {
+        endstone::Logger::Level level;
+        std::string message;
+    };
+
+    std::vector<LogRecord> records;
+};
+
+/**
+ * @brief Minimal endstone::Plugin identity for Python regression tests.
+ */
+class TestPlugin final : public endstone::Plugin {
+public:
+    explicit TestPlugin(std::string name) : description_(std::move(name), "1.0.0") {}
+
+    [[nodiscard]] const endstone::PluginDescription &getDescription() const override { return description_; }
+
+private:
+    endstone::PluginDescription description_;
+};
+
+/**
+ * @brief Owns a PlaceholderApiImpl backed by TestPlatform/TestPlugin.
+ *
+ * Lets Python regression tests exercise parse-reentrancy and cycle detection through
+ * the same GilSafeExpansionProxy + trampoline path production uses, without a running
+ * Bedrock server. Compiled out of release wheels.
+ */
+class TestService {
+public:
+    explicit TestService(std::string name)
+        : plugin_(std::make_shared<TestPlugin>(std::move(name))), platform_(std::make_shared<TestPlatform>()),
+          service_(std::make_shared<papi::detail::PlaceholderApiImpl>(platform_, plugin_->getDescription().getName()))
+    {
+    }
+
+    ~TestService()
+    {
+        if (service_) {
+            service_->shutdown();
+        }
+    }
+
+    [[nodiscard]] std::shared_ptr<papi::PlaceholderAPI> service() const { return service_; }
+
+    [[nodiscard]] endstone::Plugin &plugin() const { return *plugin_; }
+
+    bool registerExpansion(const py::object &expansion)
+    {
+        return registerExpansionFromPython(*service_, *plugin_, expansion);
+    }
+
+    [[nodiscard]] std::vector<std::string> warningMessages() const
+    {
+        std::vector<std::string> result;
+        for (const auto &record : platform_->records) {
+            if (record.level >= endstone::Logger::Warning) {
+                result.push_back(record.message);
+            }
+        }
+        return result;
+    }
+
+private:
+    std::shared_ptr<TestPlugin> plugin_;
+    std::shared_ptr<TestPlatform> platform_;
+    std::shared_ptr<papi::detail::PlaceholderApiImpl> service_;
+};
+#endif  // PAPI_TEST_BINDINGS
 
 }  // namespace
 
@@ -203,5 +295,16 @@ PYBIND11_MODULE(_papi, m)
         }
         return std::make_shared<papi::python::GilSafeExpansionProxy>(expansion, *native);
     });
+
+    // Test-only: a service backed by an in-memory platform and plugin, so Python
+    // regression tests can exercise reentrancy and cycle detection through the real
+    // GilSafeExpansionProxy + trampoline dispatch path without a running server.
+    py::class_<TestService>(m, "_TestService", "Test-only: PlaceholderAPI backed by an in-memory platform.")
+        .def(py::init<std::string>(), py::arg("plugin_name"))
+        .def_property_readonly("service", &TestService::service, "The native PlaceholderAPI service.")
+        .def("register_expansion", &TestService::registerExpansion, py::arg("expansion"),
+             "Registers a Python expansion through the GIL-safe proxy path.")
+        .def_property_readonly("warnings", &TestService::warningMessages,
+                               "Every warning-or-above message logged by the service.");
 #endif
 }
