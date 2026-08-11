@@ -66,8 +66,7 @@ public:
     ~PythonLegacyExpansion() override  // NOLINT(bugprone-exception-escape)
     {
         if (callback_) {
-            const py::gil_scoped_acquire gil;
-            callback_ = py::none();
+            clearCallbackUnderGil();
         }
     }
 
@@ -115,11 +114,24 @@ public:
     {
         // Drop the callback here rather than at destruction so it cannot survive into a
         // window where its plugin's code may already be gone.
-        const py::gil_scoped_acquire gil;
-        callback_ = py::none();
+        clearCallbackUnderGil();
     }
 
 private:
+    /**
+     * @brief Releases the stored Python callback under the GIL, leaving callback_ empty.
+     *
+     * Setting callback_ to an empty py::object (not py::none()) ensures the member
+     * destructor is a no-op: dec_ref() is never called after the local GIL guard is
+     * destroyed. On CPython 3.10/3.11 Py_None is reference-counted, so releasing it
+     * without the GIL would be undefined.
+     */
+    void clearCallbackUnderGil()
+    {
+        const py::gil_scoped_acquire gil;
+        callback_ = py::object();
+    }
+
     std::string identifier_;
     std::string owner_;
     py::object callback_;
@@ -136,8 +148,18 @@ private:
 bool registerPlaceholderFromPython(papi::PlaceholderAPI &service, endstone::Plugin &owner,
                                    const std::string &identifier, const py::object &callback)
 {
-    if (!py::isinstance<py::function>(callback) && !py::hasattr(callback, "__call__")) {
+    // Non-executing callable check: PyCallable_Check reads the tp_call slot directly, so
+    // custom __getattribute__/descriptor machinery cannot run before the native gate
+    // rejects an inactive or off-thread caller.
+    if (PyCallable_Check(callback.ptr()) == 0) {
         throw py::type_error("register_placeholder callback must be callable");
+    }
+
+    // Reject an inactive service before constructing the adapter, so no provider-
+    // associated work runs after PAPI has begun shutting down. The full thread/state
+    // gate is enforced inside registerExpansion.
+    if (!service.isActive()) {
+        return false;
     }
 
     auto expansion = std::make_shared<PythonLegacyExpansion>(identifier, owner.getName(), callback);
@@ -253,6 +275,8 @@ public:
     {
         return registerPlaceholderFromPython(*service_, *plugin_, identifier, callback);
     }
+
+    void shutdown() { service_->shutdown(); }
 
     bool unregisterExpansion(std::string_view identifier)
     {
@@ -447,6 +471,8 @@ PYBIND11_MODULE(_papi, m)
              "Registers a Python expansion through the GIL-safe proxy path.")
         .def("register_placeholder", &TestService::registerPlaceholder, py::arg("identifier"), py::arg("callback"),
              "Registers a deprecated Python callback placeholder through the native service.")
+        .def("shutdown", &TestService::shutdown,
+             "Shuts down the service so subsequent registrations are rejected as inactive.")
         .def("unregister_expansion", &TestService::unregisterExpansion, py::arg("identifier"),
              "Unregisters one expansion owned by the test plugin.")
         .def("unregister_expansions", &TestService::unregisterExpansions,
