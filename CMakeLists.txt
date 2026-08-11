@@ -75,15 +75,15 @@ set_target_properties(_papi PROPERTIES
         VISIBILITY_INLINES_HIDDEN ON)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # _papi.so has NEEDED libc++.so.1 and libc++abi.so.1 (standard SONAMEs), but
-    # Endstone bundles these under auditwheel-hashed SONAMEs
-    # (libc++-<hash>.so.1.0, libc++abi-<hash>.so.1.0) in endstone.libs/.  We use
-    # DT_RPATH (via --disable-new-dtags) rather than DT_RUNPATH because DT_RPATH
-    # propagates to transitive dependencies: libc++'s own NEEDED entries (hashed
-    # SONAMEs) are resolved from $ORIGIN/../endstone.libs without needing
-    # preloading.  __init__.py creates standard-SONAME symlinks in this directory
-    # so the $ORIGIN entry resolves libc++.so.1 and libc++abi.so.1 to Endstone's
-    # copies.
+    # _papi.so is linked with NEEDED libc++.so.1 and libc++abi.so.1 (standard
+    # SONAMEs).  tools/repair_wheel.py patches these to Endstone's
+    # auditwheel-hashed SONAMEs (libc++-<hash>.so.1.0, libc++abi-<hash>.so.1.0)
+    # at wheel build time, so the dynamic linker resolves them from
+    # endstone.libs/ via DT_RPATH.  We use DT_RPATH (via --disable-new-dtags)
+    # rather than DT_RUNPATH because DT_RPATH propagates to transitive
+    # dependencies: libc++'s own NEEDED entries (hashed SONAMEs) are resolved
+    # from $ORIGIN/../endstone.libs without needing preloading or import-time
+    # symlinks.
     set_target_properties(_papi PROPERTIES
             INSTALL_RPATH "$ORIGIN/../endstone.libs;$ORIGIN"
             LINK_OPTIONS "-Wl,--disable-new-dtags")

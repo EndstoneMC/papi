@@ -40,3 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: Python registry, pipe parser, and all built-in placeholders
 - **BREAKING**: `{identifier|params}` pipe syntax
 - **BREAKING**: `plugin:identifier` duplicate-namespace fallback
+
+### Fixed
+
+- Linux manylinux wheels no longer mutate the installed package directory at
+  import time; libc++ SONAME resolution is established at build time via
+  `patchelf --replace-needed`, so installation on read-only or relocated
+  site-packages works without silent fallback
+- `endstone>=0.11.8,<0.12` is now declared as a runtime dependency, so
+  `pip install endstone-papi` resolves the required Endstone C++ runtime
+  automatically
+- Deprecated `register_placeholder` Python adapter no longer risks a
+  use-after-free during GIL-unsafe callback destruction and no longer invokes
+  Python attribute descriptors before the native service gate

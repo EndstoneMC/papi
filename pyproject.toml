@@ -31,6 +31,12 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
 ]
+# PAPI's native extension links against the same libc++/libc++abi that Endstone
+# bundles (Linux) and exchanges C++ objects across the Endstone ABI boundary
+# (both platforms).  The Linux wheel's _papi.so NEEDED entries are patched at
+# build time to Endstone's hashed SONAMEs, so a compatible Endstone runtime must
+# be present at install time.
+dependencies = ["endstone>=0.11.8,<0.12"]
 
 [project.urls]
 Homepage = "https://github.com/EndstoneMC/papi"
@@ -85,14 +91,17 @@ skip = ["*-musllinux*", "*_i686", "*-win32"]
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "manylinux_2_34"
 environment = { CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
-# Exclude libc++ and libc++abi from auditwheel bundling.  _papi.so links
-# against the standard SONAMEs (libc++.so.1, libc++abi.so.1); if auditwheel
-# bundles them it creates a second libc++ copy (endstone_papi.libs/) that
-# conflicts with Endstone's bundled copy (endstone.libs/), causing a segfault
-# when both are loaded in the same process.  Instead, __init__.py creates
-# standard-SONAME symlinks to Endstone's copies and DT_RPATH resolves them.
-repair-wheel-command = "auditwheel repair --exclude libc++.so.1 --exclude libc++abi.so.1 -w {dest_dir} {wheel}"
-before-build = "pip install ninja"
+# Install Endstone before building so that tools/repair_wheel.py can discover
+# the exact hashed SONAMEs in endstone.libs/ and patch _papi.so's NEEDED
+# entries to match.  The runtime dependency is also declared in
+# [project].dependencies, but we pin the exact build version for reproducibility.
+before-build = "pip install ninja endstone==0.11.8"
+# Exclude libc++ and libc++abi from auditwheel bundling: _papi.so must use
+# Endstone's single libc++ copy, not a duplicate that would segfault when both
+# are loaded.  tools/repair_wheel.py then patches _papi.so's NEEDED entries
+# from the standard SONAMEs to Endstone's hashed SONAMEs so DT_RPATH resolves
+# them from endstone.libs/.  No import-time mutation of site-packages is needed.
+repair-wheel-command = "python tools/repair_wheel.py {wheel} {dest_dir}"
 before-all = [
     "dnf install -y clang cmake ninja-build python3-pip wget xz",
     "clang --version | tee /tmp/toolchain-provenance.txt",
