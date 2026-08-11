@@ -85,6 +85,13 @@ skip = ["*-musllinux*", "*_i686", "*-win32"]
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "manylinux_2_34"
 environment = { CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
+# Exclude libc++ and libc++abi from auditwheel bundling.  _papi.so links
+# against the standard SONAMEs (libc++.so.1, libc++abi.so.1); if auditwheel
+# bundles them it creates a second libc++ copy (endstone_papi.libs/) that
+# conflicts with Endstone's bundled copy (endstone.libs/), causing a segfault
+# when both are loaded in the same process.  Instead, __init__.py creates
+# standard-SONAME symlinks to Endstone's copies and DT_RPATH resolves them.
+repair-command = "auditwheel repair --exclude libc++.so.1 --exclude libc++abi.so.1 -w {dest_dir} {wheel}"
 before-build = "pip install ninja"
 before-all = [
     "dnf install -y clang cmake ninja-build python3-pip wget xz",
