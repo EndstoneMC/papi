@@ -11,12 +11,33 @@ Consumers load the service from Endstone rather than constructing it:
         print(service.set_placeholders(player, "{demo_name}"))
 """
 
-# Import endstone.plugin first so endstone._python (and its bundled libc++.so.1
-# on Linux manylinux wheels) is loaded into the process before _papi.  The
-# dynamic linker must resolve _papi's libc++ NEEDED entry before _papi's module
-# init runs; on hosts without a system libc++ (e.g. the manylinux smoke-test
-# runner) importing _papi first would segfault at load time.
-import endstone.plugin  # noqa: F401
+# On Linux manylinux wheels, _papi.so has a NEEDED entry for libc++.so.1 that
+# the dynamic linker must resolve before the module init runs.  The smoke-test
+# runner (ubuntu-22.04) has no system libc++, so we preload the copy bundled in
+# endstone.libs/ via ctypes.  We must NOT import endstone._python here: doing so
+# would register endstone's pybind11 translate_exception as the global
+# translator, and with -fvisibility=hidden that translator cannot catch
+# std::exception thrown from _papi (cross-DSO RTTI mismatch), turning every
+# provider error into "Caught an unknown exception!".  Preloading only the
+# shared library leaves _papi as the first pybind11 module, so its own
+# translator handles its own exceptions.
+import sys
+
+if sys.platform.startswith("linux"):
+    import ctypes
+    import os
+
+    try:
+        import endstone
+
+        _libs_dir = os.path.join(os.path.dirname(os.path.dirname(endstone.__file__)), "endstone.libs")
+        if os.path.isdir(_libs_dir):
+            for _name in sorted(os.listdir(_libs_dir)):
+                if _name.startswith("libc++") and ".so." in _name:
+                    ctypes.CDLL(os.path.join(_libs_dir, _name))
+                    break
+    except (ImportError, OSError):
+        pass
 
 from ._papi import (
     SERVICE_NAME,
