@@ -74,6 +74,17 @@ set_target_properties(_papi PROPERTIES
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON)
 
+# Statically link libc++ on Linux so the wheel does not depend on a system
+# libc++.so.1.  The manylinux build image installs libc++ to /usr/local/lib
+# alongside the system libc++ from the clang package in /usr/lib64; auditwheel
+# treats the latter as a system library and does not bundle it, leaving the
+# wheel with an unresolved libc++ dependency on hosts that lack it.  Endstone
+# itself uses the same static-link approach for its shared libraries.
+if (UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_link_options(_papi PRIVATE -static-libgcc -static-libstdc++)
+    target_link_libraries(_papi PRIVATE libc++.a libc++abi.a)
+endif ()
+
 # Test-only bindings let Python regression tests construct internal types directly.
 # Compiled out of release wheels, where BUILD_TESTING is OFF.
 if (NOT BUILD_TESTING STREQUAL OFF)
