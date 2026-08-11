@@ -543,6 +543,10 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
     // CallLease::~CallLease() (noexcept).  invokeProvider and dispatchLifecycleEvent
     // already contain provider/listener exceptions; this is the last-resort guard
     // against residual bad_alloc-class failures from logging or event construction.
+    // clang-tidy cannot prove catch(...) makes the lambda noexcept, and the empty
+    // catch is intentional (logging here could re-throw), so both checks are
+    // suppressed.
+    // NOLINTNEXTLINE(bugprone-exception-escape)
     auto cleanup = [this, entry, reason, generation, info] {
         try {
             if (const auto expansion = entry->getExpansion()) {
@@ -566,8 +570,9 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
                 dispatchLifecycleEvent(event);
             }
         }
+        // NOLINTNEXTLINE(bugprone-empty-catch)
         catch (...) {
-            // Swallow -- see comment above.
+            // Intentionally swallowed -- see comment above.
         }
     };
 
