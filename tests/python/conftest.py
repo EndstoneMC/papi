@@ -12,6 +12,7 @@ affect release artifacts. ``.gitignore`` already excludes ``*.pyd`` and ``*.so``
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 # tests/python/conftest.py -> tests/ -> project root
@@ -37,7 +38,11 @@ def _ensure_native_module() -> None:
 
         return
     except ImportError:
-        pass
+        # Remove any partial import state so the copy below takes full effect.
+        # A failed ``from ._papi import ...`` in __init__.py can leave
+        # ``endstone_papi`` in sys.modules, preventing re-import after the copy.
+        sys.modules.pop("endstone_papi", None)
+        sys.modules.pop("endstone_papi._papi", None)
 
     source = _find_built_module()
     if source is None:
