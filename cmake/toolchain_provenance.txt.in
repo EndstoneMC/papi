@@ -1,0 +1,4 @@
+compiler_id=@CMAKE_CXX_COMPILER_ID@
+compiler_version=@CMAKE_CXX_COMPILER_VERSION@
+compiler_frontend=@CMAKE_CXX_COMPILER_FRONTEND_VARIANT@
+cxx_standard=20

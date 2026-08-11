@@ -144,6 +144,7 @@ def test_repair_wheel_script_fails_closed_on_missing_patchelf() -> None:
 
 
 def test_repair_wheel_script_fails_closed_on_missing_compiler() -> None:
-    """If clang is not available, bridge construction must fail closed."""
+    """If the configured compiler is unavailable or not Clang 20, fail closed."""
     source = _REPAIR_SCRIPT.read_text(encoding="utf-8")
-    assert "clang not found" in source, "must fail with clear message if clang is missing"
+    assert "compiler {compiler_name!r} not found" in source
+    assert "Clang 20 is required" in source

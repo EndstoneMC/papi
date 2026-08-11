@@ -17,6 +17,7 @@ and the wheel build fails.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -60,9 +61,13 @@ def main() -> None:
     patchelf = shutil.which("patchelf")
     if patchelf is None:
         sys.exit("repair_wheel: patchelf not found on PATH")
-    compiler = shutil.which("clang")
+    compiler_name = os.environ.get("CC", "clang")
+    compiler = shutil.which(compiler_name)
     if compiler is None:
-        sys.exit("repair_wheel: clang not found on PATH")
+        sys.exit(f"repair_wheel: compiler {compiler_name!r} not found")
+    compiler_version = subprocess.check_output([compiler, "--version"], text=True).splitlines()[0]
+    if not compiler_version.startswith("clang version 20."):
+        sys.exit(f"repair_wheel: Clang 20 is required, got {compiler_version}")
 
     # Step 1: Run auditwheel with --exclude to avoid bundling a duplicate libc++.
     subprocess.check_call(

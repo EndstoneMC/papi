@@ -1,9 +1,8 @@
 [build-system]
-# Both build dependencies are pinned to exact versions for reproducibility and to
-# keep the PEP 517 pybind11 package in lock-step with the Conan-resolved
-# pybind11/3.0.1 that provides the CMake headers (find_package(pybind11)).
-# Bump both together when upgrading: conanfile.py must match.
-requires = ["scikit-build-core-conan==0.9.2", "pybind11==3.0.1"]
+# ABI-sensitive build dependencies are pinned for reproducibility. Keep the PEP 517
+# pybind11 package in lock-step with the Conan-resolved pybind11/3.0.1 CMake headers,
+# and update the CI Conan pin together with this declaration.
+requires = ["scikit-build-core-conan==0.9.2", "conan==2.30.0", "pybind11==3.0.1"]
 build-backend = "scikit_build_core_conan.build"
 
 [project]
@@ -33,9 +32,9 @@ classifiers = [
 ]
 # PAPI's native extension links against the same libc++/libc++abi that Endstone
 # bundles (Linux) and exchanges C++ objects across the Endstone ABI boundary
-# (both platforms).  The Linux wheel's _papi.so NEEDED entries are patched at
-# build time to Endstone's hashed SONAMEs, so a compatible Endstone runtime must
-# be present at install time.
+# (both platforms). The Linux wheel preserves standard libc++ NEEDED entries and
+# ships bridge DSOs that depend on Endstone's hashed SONAMEs, so a compatible
+# Endstone runtime must be present at install time.
 dependencies = ["endstone>=0.11.8,<0.12"]
 
 [project.urls]
@@ -90,7 +89,7 @@ skip = ["*-musllinux*", "*_i686", "*-win32"]
 
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "manylinux_2_34"
-environment = { CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
+environment = { CC = "/usr/bin/clang-20", CXX = "/usr/bin/clang++-20" }
 # Install Endstone before building so that tools/repair_wheel.py can discover
 # the exact hashed SONAMEs in endstone.libs/ and build standard-SONAME bridge
 # DSOs that forward to them. The runtime dependency is also declared in
@@ -103,14 +102,16 @@ before-build = "pip install ninja wheel endstone==0.11.8"
 # of site-packages is needed.
 repair-wheel-command = "python tools/repair_wheel.py {wheel} {dest_dir}"
 before-all = [
-    "dnf install -y clang cmake ninja-build python3-pip wget xz",
-    "clang --version | tee /tmp/toolchain-provenance.txt",
-    "clang --version | grep -E 'clang version (1[89]|[2-9][0-9])'",
-    "wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/llvm-project-20.1.0.src.tar.xz -O /tmp/llvm.tar.xz",
+    "dnf install -y clang-20.1.8-3.el9 cmake ninja-build python3-pip wget xz",
+    "/usr/bin/clang-20 --version | tee /tmp/toolchain-provenance.txt",
+    "/usr/bin/clang-20 --version | grep -E 'clang version 20\\.'",
+    "test \"$(rpm -q --qf '%{VERSION}-%{RELEASE}' clang)\" = '20.1.8-3.el9'",
+    "wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/llvm-project-20.1.8.src.tar.xz -O /tmp/llvm.tar.xz",
+    "echo '6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d  /tmp/llvm.tar.xz' | sha256sum -c -",
     "tar xf /tmp/llvm.tar.xz -C /tmp",
-    "cmake -B /tmp/libcxx-build -S /tmp/llvm-project-20.1.0.src/runtimes -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi' -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=OFF -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF",
+    "cmake -B /tmp/libcxx-build -S /tmp/llvm-project-20.1.8.src/runtimes -G Ninja -DCMAKE_C_COMPILER=/usr/bin/clang-20 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-20 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi' -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=OFF -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF",
     "cmake --build /tmp/libcxx-build --target install-cxx install-cxxabi -- -j$(nproc)",
-    "rm -rf /tmp/llvm.tar.xz /tmp/llvm-project-20.1.0.src /tmp/libcxx-build",
+    "rm -rf /tmp/llvm.tar.xz /tmp/llvm-project-20.1.8.src /tmp/libcxx-build",
 ]
 
 [tool.cibuildwheel.windows]

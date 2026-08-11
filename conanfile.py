@@ -59,6 +59,12 @@ class PapiRecipe(ConanFile):
         if self.settings.os == "Linux" and self.settings.compiler.libcxx != "libc++":
             raise ConanInvalidConfiguration(f"{self.ref} requires libc++ on Linux for Endstone ABI compatibility.")
 
+        if self.settings.os == "Linux" and str(self.settings.compiler.version) != "20":
+            raise ConanInvalidConfiguration(
+                f"{self.ref} requires Clang 20 on Linux for Endstone ABI compatibility, "
+                f"not Clang {self.settings.compiler.version}."
+            )
+
     def generate(self):
         CMakeDeps(self).generate()
         tc = CMakeToolchain(self)

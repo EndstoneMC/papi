@@ -9,6 +9,7 @@ pytest suite (which uses the dev build with test-only bindings).
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import endstone_papi
 from endstone_papi import (
@@ -23,6 +24,9 @@ def main() -> int:
     version = endstone_papi.__version__
     assert version, f"empty version: {version!r}"
     assert endstone_papi.SERVICE_NAME == "PlaceholderAPI"
+    provenance = Path(endstone_papi.__file__).with_name("_toolchain_provenance.txt").read_text(encoding="utf-8")
+    assert "compiler_id=Clang" in provenance, provenance
+    assert "compiler_version=20." in provenance, provenance
 
     # PlaceholderExpansion is subclassable and metadata is readable through the
     # native trampoline.

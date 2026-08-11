@@ -2,11 +2,21 @@ cmake_minimum_required(VERSION 3.29)
 
 project(papi VERSION 1.0.0 LANGUAGES CXX)
 
+if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 20 OR NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 21)
+    message(FATAL_ERROR
+            "endstone_papi: Clang 20 is required for the supported Endstone ABI, but CMake detected "
+            "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}.")
+endif ()
+
 # Generate the public version header from the CMake project version so that
 # getVersion() is header-only and CMakeLists.txt is the single version source.
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.h.in
         ${CMAKE_CURRENT_BINARY_DIR}/generated/include/endstone_papi/version.h
+        @ONLY)
+configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain_provenance.txt.in
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/toolchain_provenance.txt
         @ONLY)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -76,14 +86,10 @@ set_target_properties(_papi PROPERTIES
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # _papi.so is linked with NEEDED libc++.so.1 and libc++abi.so.1 (standard
-    # SONAMEs).  tools/repair_wheel.py patches these to Endstone's
-    # auditwheel-hashed SONAMEs (libc++-<hash>.so.1.0, libc++abi-<hash>.so.1.0)
-    # at wheel build time, so the dynamic linker resolves them from
-    # endstone.libs/ via DT_RPATH.  We use DT_RPATH (via --disable-new-dtags)
-    # rather than DT_RUNPATH because DT_RPATH propagates to transitive
-    # dependencies: libc++'s own NEEDED entries (hashed SONAMEs) are resolved
-    # from $ORIGIN/../endstone.libs without needing preloading or import-time
-    # symlinks.
+    # SONAMEs). tools/repair_wheel.py preserves those entries and installs tiny
+    # standard-SONAME bridge DSOs whose only NEEDED entries name Endstone's
+    # auditwheel-hashed runtime. DT_RPATH (via --disable-new-dtags) propagates to
+    # those transitive dependencies without preloading or import-time mutation.
     set_target_properties(_papi PROPERTIES
             INSTALL_RPATH "$ORIGIN/../endstone.libs;$ORIGIN"
             LINK_OPTIONS "-Wl,--disable-new-dtags")
@@ -97,6 +103,8 @@ if (NOT BUILD_TESTING STREQUAL OFF)
 endif ()
 
 install(TARGETS _papi DESTINATION "endstone_papi" COMPONENT python)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/toolchain_provenance.txt
+        DESTINATION "endstone_papi" RENAME "_toolchain_provenance.txt" COMPONENT python)
 install(DIRECTORY include/ DESTINATION "endstone_papi/include" COMPONENT python)
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated/include/ DESTINATION "endstone_papi/include" COMPONENT python)
 

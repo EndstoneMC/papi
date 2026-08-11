@@ -41,7 +41,7 @@ Run Windows commands from an x64 MSVC developer environment with LLVM's `clang-c
 on `PATH`.
 
 ```shell
-python -m pip install "conan>=2,<3"
+python -m pip install "conan==2.30.0"
 conan install . --build=missing
 cmake --preset papi-dev
 cmake --build --preset papi-dev

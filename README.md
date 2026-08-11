@@ -177,7 +177,7 @@ Requires CMake 3.29+, Ninja, Conan 2, and the Endstone toolchain: `clang-cl` on
 Windows (from an x64 MSVC developer environment) or Clang with libc++ on Linux.
 
 ```shell
-python -m pip install "conan>=2,<3"
+python -m pip install "conan==2.30.0"
 conan install . --build=missing
 cmake --preset papi-dev
 cmake --build --preset papi-dev
