@@ -538,26 +538,36 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
     // fires after onUnregister and provider release, even when cleanup is deferred
     // by an active call lease. PapiShutdown suppresses it because the event system
     // is itself being torn down.
+    //
+    // The body is wrapped in a catch-all because the lambda may run deferred from
+    // CallLease::~CallLease() (noexcept).  invokeProvider and dispatchLifecycleEvent
+    // already contain provider/listener exceptions; this is the last-resort guard
+    // against residual bad_alloc-class failures from logging or event construction.
     auto cleanup = [this, entry, reason, generation, info] {
-        if (const auto expansion = entry->getExpansion()) {
-            std::string error_message;
-            if (!invokeProvider([&] { expansion->onUnregister(reason); }, error_message)) {
-                logProviderError(info, generation, ErrorOperation::Unregister, error_message);
+        try {
+            if (const auto expansion = entry->getExpansion()) {
+                std::string error_message;
+                if (!invokeProvider([&] { expansion->onUnregister(reason); }, error_message)) {
+                    logProviderError(info, generation, ErrorOperation::Unregister, error_message);
+                }
+            }
+
+            // Release the provider object here, while the module and interpreter that
+            // own its code are still loaded.
+            auto released = entry->releaseExpansion();
+            released.reset();
+
+            // owner_ was already cleared atomically at retirement, so no stale
+            // plugin identity survives the deferred-cleanup window.
+            throttle_.forget(generation);
+
+            if (reason != UnregisterReason::PapiShutdown) {
+                ExpansionUnregisteredEvent event{info, reason};
+                dispatchLifecycleEvent(event);
             }
         }
-
-        // Release the provider object here, while the module and interpreter that
-        // own its code are still loaded.
-        auto released = entry->releaseExpansion();
-        released.reset();
-
-        // owner_ was already cleared atomically at retirement, so no stale
-        // plugin identity survives the deferred-cleanup window.
-        throttle_.forget(generation);
-
-        if (reason != UnregisterReason::PapiShutdown) {
-            ExpansionUnregisteredEvent event{info, reason};
-            dispatchLifecycleEvent(event);
+        catch (...) {
+            // Swallow -- see comment above.
         }
     };
 

@@ -25,6 +25,9 @@
 
 #include <gtest/gtest.h>
 
+// GoogleTest ASSERT_TRUE(x.has_value()) aborts on failure, but clang-tidy
+// cannot track this through the macro, producing false positives below.
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
 namespace {
 
 // REG-015: metadata copies must be plain values that outlive their expansion.
@@ -159,3 +162,4 @@ TEST(Events, CarryOnlyCopiedMetadata)
 }
 
 }  // namespace
+// NOLINTEND(bugprone-unchecked-optional-access)
