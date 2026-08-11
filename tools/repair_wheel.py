@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Repair the PAPI wheel for Linux manylinux.
 
 Runs auditwheel with ``--exclude`` to avoid bundling a duplicate libc++ (which

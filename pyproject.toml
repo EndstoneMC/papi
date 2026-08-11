@@ -95,7 +95,7 @@ environment = { CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
 # the exact hashed SONAMEs in endstone.libs/ and patch _papi.so's NEEDED
 # entries to match.  The runtime dependency is also declared in
 # [project].dependencies, but we pin the exact build version for reproducibility.
-before-build = "pip install ninja endstone==0.11.8"
+before-build = "pip install ninja wheel endstone==0.11.8"
 # Exclude libc++ and libc++abi from auditwheel bundling: _papi.so must use
 # Endstone's single libc++ copy, not a duplicate that would segfault when both
 # are loaded.  tools/repair_wheel.py then patches _papi.so's NEEDED entries
