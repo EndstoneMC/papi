@@ -92,15 +92,15 @@ skip = ["*-musllinux*", "*_i686", "*-win32"]
 manylinux-x86_64-image = "manylinux_2_34"
 environment = { CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
 # Install Endstone before building so that tools/repair_wheel.py can discover
-# the exact hashed SONAMEs in endstone.libs/ and patch _papi.so's NEEDED
-# entries to match.  The runtime dependency is also declared in
+# the exact hashed SONAMEs in endstone.libs/ and build standard-SONAME bridge
+# DSOs that forward to them. The runtime dependency is also declared in
 # [project].dependencies, but we pin the exact build version for reproducibility.
 before-build = "pip install ninja wheel endstone==0.11.8"
 # Exclude libc++ and libc++abi from auditwheel bundling: _papi.so must use
 # Endstone's single libc++ copy, not a duplicate that would segfault when both
-# are loaded.  tools/repair_wheel.py then patches _papi.so's NEEDED entries
-# from the standard SONAMEs to Endstone's hashed SONAMEs so DT_RPATH resolves
-# them from endstone.libs/.  No import-time mutation of site-packages is needed.
+# are loaded. tools/repair_wheel.py then creates no-implementation bridge DSOs
+# whose hashed dependencies resolve from endstone.libs/. No import-time mutation
+# of site-packages is needed.
 repair-wheel-command = "python tools/repair_wheel.py {wheel} {dest_dir}"
 before-all = [
     "dnf install -y clang cmake ninja-build python3-pip wget xz",

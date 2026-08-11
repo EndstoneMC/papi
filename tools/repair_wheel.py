@@ -1,16 +1,14 @@
 """Repair the PAPI wheel for Linux manylinux.
 
 Runs auditwheel with ``--exclude`` to avoid bundling a duplicate libc++ (which
-would conflict with Endstone's copy and segfault), then patches ``_papi.so``'s
-NEEDED entries from the standard SONAMEs (``libc++.so.1``, ``libc++abi.so.1``)
-to Endstone's auditwheel-hashed SONAMEs (``libc++-<hash>.so.1.0`` etc.) using
-``patchelf --replace-needed``.
+would conflict with Endstone's copy and segfault), then adds tiny standard-SONAME
+bridge DSOs beside ``_papi.so``. Each bridge has no runtime implementation of its
+own; it depends on the corresponding auditwheel-hashed Endstone DSO.
 
-This establishes deterministic runtime ownership at **build time**: the NEEDED
-entries in the shipped wheel match Endstone's bundled libc++ SONAMEs, and
-``DT_RPATH "$ORIGIN/../endstone.libs:$ORIGIN"`` (set via ``--disable-new-dtags``
-in CMakeLists.txt so it propagates to transitive dependencies) resolves them
-from ``endstone.libs/``.  No import-time mutation of site-packages is needed.
+This establishes deterministic runtime ownership at **build time**: _papi's
+standard NEEDED entries resolve to the bridges through ``$ORIGIN``, while each
+bridge's old-style RPATH resolves its hashed dependency from ``endstone.libs/``.
+No import-time mutation of site-packages is needed.
 
 Fail-closed: if Endstone is not installed, no hashed lib is found, multiple
 ambiguous matches exist, or patchelf is unavailable, the script exits non-zero
@@ -62,6 +60,9 @@ def main() -> None:
     patchelf = shutil.which("patchelf")
     if patchelf is None:
         sys.exit("repair_wheel: patchelf not found on PATH")
+    compiler = shutil.which("clang")
+    if compiler is None:
+        sys.exit("repair_wheel: clang not found on PATH")
 
     # Step 1: Run auditwheel with --exclude to avoid bundling a duplicate libc++.
     subprocess.check_call(
@@ -87,7 +88,9 @@ def main() -> None:
     # Step 3: Find Endstone's hashed SONAMEs.
     replacements = _find_endstone_hashed_sonames()
 
-    # Step 4: Unpack, patchelf --replace-needed, repack.
+    # Step 4: Unpack, add standard-SONAME bridges, and repack. Rewriting
+    # _papi.so's NEEDED entries directly to Endstone's hashed names crashes
+    # during module initialization, while the standard SONAME path is proven.
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.check_call([sys.executable, "-m", "wheel", "unpack", str(repaired), "-d", tmp])
         unpacked = list(Path(tmp).iterdir())
@@ -96,17 +99,38 @@ def main() -> None:
         pkg_root = unpacked[0]
 
         so_files = list(pkg_root.rglob("_papi*.so"))
-        if not so_files:
+        if len(so_files) != 1:
             sys.exit(f"repair_wheel: _papi*.so not found in unpacked wheel {pkg_root}")
-        for so in so_files:
-            for old, new in replacements.items():
-                subprocess.check_call([patchelf, "--replace-needed", old, new, str(so)])
+        module = so_files[0]
+        needed = subprocess.check_output([patchelf, "--print-needed", str(module)], text=True).splitlines()
+        for soname in replacements:
+            if soname not in needed:
+                sys.exit(f"repair_wheel: {module.name} does not require {soname}")
 
-        # wheel pack regenerates RECORD with the patched .so's new hash.
+        bridge_source = Path(tmp) / "runtime_bridge.c"
+        bridge_source.write_text("void papi_runtime_bridge(void) {}\n", encoding="utf-8")
+        for soname, hashed_soname in replacements.items():
+            bridge = module.parent / soname
+            subprocess.check_call(
+                [
+                    compiler,
+                    "-shared",
+                    "-fPIC",
+                    "-nostdlib",
+                    f"-Wl,-soname,{soname}",
+                    "-o",
+                    str(bridge),
+                    str(bridge_source),
+                ]
+            )
+            subprocess.check_call([patchelf, "--add-needed", hashed_soname, str(bridge)])
+            subprocess.check_call([patchelf, "--force-rpath", "--set-rpath", "$ORIGIN/../endstone.libs", str(bridge)])
+
+        # wheel pack records the bridge DSOs and regenerates RECORD.
         repaired.unlink()
         subprocess.check_call([sys.executable, "-m", "wheel", "pack", str(pkg_root), "-d", str(dest_dir)])
 
-    print(f"repair_wheel: patched NEEDED entries -> {replacements}")
+    print(f"repair_wheel: added standard-SONAME bridges -> {replacements}")
 
 
 if __name__ == "__main__":

@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Linux wheels now establish their Endstone-owned C++ runtime dependency with
+  build-time standard-SONAME bridge DSOs, avoiding both import-time package
+  mutation and direct hashed-SONAME loader crashes.
+
 - Linux manylinux wheels no longer mutate the installed package directory at
   import time; libc++ SONAME resolution is established at build time via
   `patchelf --replace-needed`, so installation on read-only or relocated

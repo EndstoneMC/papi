@@ -9,7 +9,7 @@ mutation of site-packages:
   extension cannot be loaded.
 - ``pyproject.toml`` must declare the Endstone runtime dependency.
 - ``tools/repair_wheel.py`` must establish deterministic runtime ownership at
-  build time via ``patchelf --replace-needed`` and fail closed on mismatch.
+  build time via standard-SONAME bridge DSOs and fail closed on mismatch.
 """
 
 from __future__ import annotations
@@ -102,11 +102,13 @@ def test_repair_wheel_script_exists() -> None:
     assert _REPAIR_SCRIPT.is_file(), "tools/repair_wheel.py must exist"
 
 
-def test_repair_wheel_script_uses_patchelf_replace_needed() -> None:
-    """The script must patch NEEDED entries, not create import-time symlinks."""
+def test_repair_wheel_script_builds_standard_soname_bridges() -> None:
+    """The script must build bridges, not mutate imports or rewrite _papi NEEDED."""
     source = _REPAIR_SCRIPT.read_text(encoding="utf-8")
-    assert "--replace-needed" in source, "must use patchelf --replace-needed to patch NEEDED entries"
-    assert "os.symlink" not in source, "must not create symlinks (build-time NEEDED patching instead)"
+    assert '"--add-needed"' in source, "bridge must depend on Endstone's hashed runtime"
+    assert 'f"-Wl,-soname,{soname}"' in source, "bridge must expose the standard SONAME"
+    assert "--replace-needed" not in source, "direct hashed-SONAME rewriting crashes module initialization"
+    assert "os.symlink" not in source, "must not create symlinks"
 
 
 def test_repair_wheel_script_uses_auditwheel_exclude() -> None:
@@ -139,3 +141,9 @@ def test_repair_wheel_script_fails_closed_on_missing_patchelf() -> None:
     """If patchelf is not available, the script must exit non-zero."""
     source = _REPAIR_SCRIPT.read_text(encoding="utf-8")
     assert "patchelf not found" in source, "must fail with clear message if patchelf missing"
+
+
+def test_repair_wheel_script_fails_closed_on_missing_compiler() -> None:
+    """If clang is not available, bridge construction must fail closed."""
+    source = _REPAIR_SCRIPT.read_text(encoding="utf-8")
+    assert "clang not found" in source, "must fail with clear message if clang is missing"
