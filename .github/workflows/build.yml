@@ -264,7 +264,22 @@ jobs:
           python -m pip install endstone==0.11.8
           whl="$(python -c 'import pathlib; print(list(pathlib.Path("wheelhouse").glob("*.whl"))[0])')"
           python -m pip install --no-deps "$whl"
-          python tools/wheel_smoke_test.py
+          # Diagnose libc++ resolution on manylinux wheels.
+          _site="$(python -c 'import site; print(site.getsitepackages()[0])')"
+          _papi="$(ls "$_site"/endstone_papi/_papi*.so 2>/dev/null | head -1)"
+          echo "=== _papi.so path ==="
+          echo "$_papi"
+          echo "=== readelf -d ==="
+          readelf -d "$_papi" 2>&1 || true
+          echo "=== ldd ==="
+          ldd "$_papi" 2>&1 || true
+          echo "=== endstone.libs ==="
+          ls -la "$_site/endstone.libs/" 2>&1 || echo "no endstone.libs"
+          echo "=== endstone_papi dir ==="
+          ls -la "$_site/endstone_papi/" 2>&1 || true
+          echo "=== LD_LIBRARY_PATH ==="
+          echo "$LD_LIBRARY_PATH"
+          PAPI_DEBUG=1 python tools/wheel_smoke_test.py
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
