@@ -91,7 +91,7 @@ environment = { CC = "/usr/bin/clang", CXX = "/usr/bin/clang++" }
 # conflicts with Endstone's bundled copy (endstone.libs/), causing a segfault
 # when both are loaded in the same process.  Instead, __init__.py creates
 # standard-SONAME symlinks to Endstone's copies and DT_RPATH resolves them.
-repair-command = "auditwheel repair --exclude libc++.so.1 --exclude libc++abi.so.1 -w {dest_dir} {wheel}"
+repair-wheel-command = "auditwheel repair --exclude libc++.so.1 --exclude libc++abi.so.1 -w {dest_dir} {wheel}"
 before-build = "pip install ninja"
 before-all = [
     "dnf install -y clang cmake ninja-build python3-pip wget xz",
