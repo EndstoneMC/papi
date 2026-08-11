@@ -87,6 +87,7 @@ jobs:
           python tools/test_release_changelog.py
           python tools/test_release_transaction.py
           python tools/test_toolchain_policy.py
+          python tools/test_sdist_policy.py
 
   native-windows:
     name: Native (Windows)
@@ -328,6 +329,14 @@ jobs:
           print(f'OK: sdist contains all native sources')
           "
 
+      - name: Stage only the sdist archive
+        shell: bash
+        run: |
+          rm -rf /tmp/papi-sdist-input /tmp/papi-sdist-build /tmp/papi-sdist-smoke
+          mkdir /tmp/papi-sdist-input /tmp/papi-sdist-build /tmp/papi-sdist-smoke
+          cp dist/*.tar.gz /tmp/papi-sdist-input/
+          test "$(find /tmp/papi-sdist-input -maxdepth 1 -type f | wc -l)" -eq 1
+
       - name: Install Clang 20
         run: |
           wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
@@ -339,21 +348,26 @@ jobs:
           clang --version | grep -E "clang version 20\\."
 
       - name: Install Conan and build tools
-        run: python -m pip install "conan==2.30.0" cmake ninja "scikit-build-core-conan==0.9.2" "pybind11==3.0.1"
+        run: |
+          python -m venv /tmp/papi-sdist-build-env
+          /tmp/papi-sdist-build-env/bin/python -m pip install \
+            "conan==2.30.0" cmake ninja "scikit-build-core-conan==0.9.2" "pybind11==3.0.1"
 
-      - name: Build wheel from sdist
+      - name: Build wheel from isolated sdist archive
         shell: bash
         run: |
-          sdist="$(python -c 'import pathlib; print(list(pathlib.Path("dist").glob("*.tar.gz"))[0])')"
-          pip wheel --no-deps --no-build-isolation "$sdist" -w wheelhouse/
+          cd /tmp/papi-sdist-build
+          CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
+            /tmp/papi-sdist-build-env/bin/pip wheel --no-deps --no-build-isolation \
+            /tmp/papi-sdist-input/*.tar.gz -w "$GITHUB_WORKSPACE/wheelhouse/"
 
-      - name: Runtime smoke test from sdist-built wheel
+      - name: Runtime smoke test from isolated sdist-built wheel
         shell: bash
         run: |
-          python -m pip install endstone==0.11.8
-          whl="$(python -c 'import pathlib; print(list(pathlib.Path("wheelhouse").glob("*.whl"))[0])')"
-          python -m pip install "$whl"
-          python tools/wheel_smoke_test.py
+          python -m venv /tmp/papi-sdist-smoke-env
+          /tmp/papi-sdist-smoke-env/bin/pip install endstone==0.11.8 wheelhouse/*.whl
+          cd /tmp/papi-sdist-smoke
+          /tmp/papi-sdist-smoke-env/bin/python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

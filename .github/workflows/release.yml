@@ -322,7 +322,7 @@ jobs:
     if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.published != 'true' && needs.release.outputs.version != ''
     needs: release
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -343,6 +343,51 @@ jobs:
 
       - name: Build sdist
         run: python -m build --sdist
+
+      - name: Verify and isolate sdist archive
+        shell: bash
+        run: |
+          python -c "
+          import pathlib, tarfile
+          sdist = list(pathlib.Path('dist').glob('*.tar.gz'))
+          assert len(sdist) == 1, sdist
+          names = tarfile.open(sdist[0]).getnames()
+          for required in ['module.cpp', 'gil_safe_proxy.cpp', 'expansion_trampoline.cpp',
+                           'bootstrap.cpp', 'placeholder_api_impl.cpp']:
+              assert any(required in name for name in names), f'{required} missing from sdist'
+          "
+          rm -rf /tmp/papi-sdist-input /tmp/papi-sdist-build /tmp/papi-sdist-smoke /tmp/papi-sdist-wheel
+          mkdir /tmp/papi-sdist-input /tmp/papi-sdist-build /tmp/papi-sdist-smoke /tmp/papi-sdist-wheel
+          cp dist/*.tar.gz /tmp/papi-sdist-input/
+          test "$(find /tmp/papi-sdist-input -maxdepth 1 -type f | wc -l)" -eq 1
+
+      - name: Install Clang 20
+        shell: bash
+        run: |
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 20
+          sudo apt-get install -y libc++-20-dev libc++abi-20-dev
+          /usr/bin/clang-20 --version | grep -E "clang version 20\\."
+
+      - name: Build wheel from isolated sdist archive
+        shell: bash
+        run: |
+          python -m venv /tmp/papi-sdist-build-env
+          /tmp/papi-sdist-build-env/bin/python -m pip install \
+            "conan==2.30.0" cmake ninja "scikit-build-core-conan==0.9.2" "pybind11==3.0.1"
+          cd /tmp/papi-sdist-build
+          CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
+            /tmp/papi-sdist-build-env/bin/pip wheel --no-deps --no-build-isolation \
+            /tmp/papi-sdist-input/*.tar.gz -w /tmp/papi-sdist-wheel/
+
+      - name: Runtime smoke test from isolated sdist-built wheel
+        shell: bash
+        run: |
+          python -m venv /tmp/papi-sdist-smoke-env
+          /tmp/papi-sdist-smoke-env/bin/pip install endstone==0.11.8 /tmp/papi-sdist-wheel/*.whl
+          cd /tmp/papi-sdist-smoke
+          /tmp/papi-sdist-smoke-env/bin/python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
