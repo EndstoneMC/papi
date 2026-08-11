@@ -27,6 +27,14 @@ def test_service_is_an_endstone_service() -> None:
     assert issubclass(endstone_papi.PlaceholderAPI, Service)
 
 
+def test_service_exposes_typed_service_manager_loader() -> None:
+    import endstone_papi
+
+    assert callable(endstone_papi.PlaceholderAPI.load)
+    with pytest.raises(TypeError):
+        endstone_papi.PlaceholderAPI.load(object())
+
+
 def test_service_cannot_be_constructed_from_python() -> None:
     import endstone_papi
 

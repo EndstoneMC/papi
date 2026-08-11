@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <endstone/plugin/plugin_description.h>
+#include <endstone/plugin/service_manager.h>
 #include <pybind11/native_enum.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -393,6 +394,13 @@ PYBIND11_MODULE(_papi, m)
     // silently appears to work while bypassing the framework's lifecycle.
     py::class_<papi::PlaceholderAPI, endstone::Service, std::shared_ptr<papi::PlaceholderAPI>>(
         m, "PlaceholderAPI", "Resolves placeholders through registered expansions.", py::is_final())
+        .def_static(
+            "load",
+            [](const endstone::ServiceManager &manager) {
+                return manager.load<papi::PlaceholderAPI>(std::string(papi::PlaceholderAPI::ServiceName));
+            },
+            py::arg("service_manager"),
+            "Loads the typed PlaceholderAPI service. Returns None when PAPI is unavailable.")
         .def_property_readonly("active", &papi::PlaceholderAPI::isActive,
                                "Whether this service is still usable. False once PAPI has been disabled.")
         .def("set_placeholders", &papi::PlaceholderAPI::setPlaceholders, py::arg("player"), py::arg("text"),

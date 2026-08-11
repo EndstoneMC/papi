@@ -28,8 +28,8 @@ class JoinExample(Plugin):
         self._api: PlaceholderAPI | None = None
 
     def on_enable(self) -> None:
-        service = self.server.service_manager.load("PlaceholderAPI")
-        if not isinstance(service, PlaceholderAPI) or not service.active:
+        service = PlaceholderAPI.load(self.server.service_manager)
+        if service is None or not service.active:
             self.logger.warning("PlaceholderAPI is unavailable; disabling example.")
             self.server.plugin_manager.disable_plugin(self)
             return

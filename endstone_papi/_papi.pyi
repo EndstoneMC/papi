@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from endstone import OfflinePlayer, Player
 from endstone.event import Event
-from endstone.plugin import Plugin, Service
+from endstone.plugin import Plugin, Service, ServiceManager
 
 __all__ = [
     "SERVICE_NAME",
@@ -142,6 +142,10 @@ class PlaceholderAPI(Service):
     Parsing and registration must happen on the server thread, because they call into
     provider code.
     """
+
+    @staticmethod
+    def load(service_manager: ServiceManager) -> PlaceholderAPI | None:
+        """Load the typed service, or None when PAPI is unavailable."""
 
     @property
     def active(self) -> bool:

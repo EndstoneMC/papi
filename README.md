@@ -107,8 +107,8 @@ class MyPlugin(Plugin):
     soft_depend = ["papi"]
 
     def on_enable(self):
-        service = self.server.service_manager.load("PlaceholderAPI")
-        if not isinstance(service, PlaceholderAPI) or not service.active:
+        service = PlaceholderAPI.load(self.server.service_manager)
+        if service is None or not service.active:
             return
         service.register_expansion(self, NameExpansion())
 ```
@@ -146,7 +146,7 @@ This release is a rewrite; 0.0.1 plugins need changes.
 |---|---|
 | `{identifier\|params}` | `{identifier_params}` |
 | built-in placeholders (`{x}`, `{ping}`, `{date}`, …) | provide them from your own expansion |
-| `PlaceholderAPI(plugin)` in Python | load the service from the service manager |
+| `PlaceholderAPI(plugin)` in Python | `PlaceholderAPI.load(server.service_manager)` |
 | subclassing `PlaceholderAPI` | subclass `PlaceholderExpansion` instead |
 | `register_placeholder(plugin, id, processor)` | `register_expansion(plugin, expansion)` |
 | duplicate id became `plugin:identifier` | duplicate registration fails |
