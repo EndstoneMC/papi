@@ -16,15 +16,22 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: Prepare release
+    name: Prepare immutable release candidate
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     outputs:
       version: ${{ steps.release_meta.outputs.version }}
       dry_run: ${{ steps.release_meta.outputs.dry_run }}
-      sha: ${{ steps.commit.outputs.sha }}
+      sha: ${{ steps.candidate.outputs.sha }}
+      base_sha: ${{ steps.release_meta.outputs.base_sha }}
+      candidate_ref: ${{ steps.release_meta.outputs.candidate_ref }}
+      published: ${{ steps.release_meta.outputs.published }}
 
     steps:
       - name: Checkout
@@ -40,9 +47,13 @@ jobs:
       - name: Validate release
         id: release_meta
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          VERSION="${{ inputs.version }}"
-          DRY_RUN="${{ inputs.dry_run }}"
+          VERSION="$INPUT_VERSION"
+          DRY_RUN="$INPUT_DRY_RUN"
 
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
@@ -54,18 +65,56 @@ jobs:
             exit 1
           fi
 
-          if git rev-parse --verify --quiet "refs/tags/v$VERSION"; then
-            echo "::error::Tag v$VERSION already exists"
-            exit 1
-          fi
-
           if [[ "$DRY_RUN" != "true" ]]; then
             git fetch origin main develop --tags
-            if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ||
-                  "$(git rev-parse HEAD)" != "$(git rev-parse origin/develop)" ]]; then
-              echo "::error::release ref, main, and develop must point to the same commit before releasing"
+            MAIN_SHA=$(git rev-parse origin/main)
+            DEVELOP_SHA=$(git rev-parse origin/develop)
+            TAG_SHA=$(git rev-parse --verify --quiet "refs/tags/v$VERSION^{commit}" || true)
+            PUBLISHED=false
+            if gh release view "v$VERSION" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+              PUBLISHED=true
+            fi
+
+            if [[ -n "$TAG_SHA" ]]; then
+              BASE_SHA=$(git rev-parse "$TAG_SHA^")
+              CANDIDATE_SHA="$TAG_SHA"
+            else
+              BASE_SHA=$(git rev-parse HEAD)
+              CANDIDATE_SHA=""
+            fi
+            # Candidate refs include their base SHA, are never force-updated,
+            # and remain as immutable recovery/provenance refs after release.
+            CANDIDATE_REF="refs/heads/release-candidates/v$VERSION-$BASE_SHA"
+            REMOTE_CANDIDATE_SHA=$(git ls-remote origin "$CANDIDATE_REF" | awk '{print $1}')
+
+            if [[ -n "$TAG_SHA" ]]; then
+              if [[ "$MAIN_SHA" != "$TAG_SHA" || "$DEVELOP_SHA" != "$TAG_SHA" ||
+                    "$REMOTE_CANDIDATE_SHA" != "$TAG_SHA" ]]; then
+                echo "::error::v$VERSION exists but main, develop, and its immutable candidate are not identical"
+                exit 1
+              fi
+            else
+              if [[ "$PUBLISHED" == "true" ]]; then
+                echo "::error::GitHub Release v$VERSION exists without its production tag"
+                exit 1
+              fi
+              if [[ "$BASE_SHA" != "$MAIN_SHA" || "$BASE_SHA" != "$DEVELOP_SHA" ]]; then
+                echo "::error::release ref, main, and develop must point to the same commit before releasing"
+                exit 1
+              fi
+              CANDIDATE_SHA="$REMOTE_CANDIDATE_SHA"
+            fi
+
+            echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+            echo "candidate_ref=$CANDIDATE_REF" >> "$GITHUB_OUTPUT"
+            echo "candidate_sha=$CANDIDATE_SHA" >> "$GITHUB_OUTPUT"
+            echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
+          else
+            if git rev-parse --verify --quiet "refs/tags/v$VERSION"; then
+              echo "::error::Tag v$VERSION already exists"
               exit 1
             fi
+            echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
           DATE=$(date -u +%Y-%m-%d)
@@ -75,7 +124,8 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare changelog and release notes
+      - name: Prepare release preview
+        if: env.DRY_RUN == 'true'
         shell: bash
         run: |
           python tools/release_changelog.py \
@@ -110,35 +160,79 @@ jobs:
           echo "=== Release notes ==="
           cat /tmp/release_body.md
 
-      - name: Update release files
+      - name: Prepare or reuse immutable candidate
+        id: candidate
         if: env.DRY_RUN != 'true'
         shell: bash
+        env:
+          BASE_SHA: ${{ steps.release_meta.outputs.base_sha }}
+          CANDIDATE_REF: ${{ steps.release_meta.outputs.candidate_ref }}
+          CANDIDATE_SHA: ${{ steps.release_meta.outputs.candidate_sha }}
         run: |
-          sed -E -i "s/^project\(papi VERSION [0-9]+\.[0-9]+\.[0-9]+ LANGUAGES CXX\)$/project(papi VERSION $VERSION LANGUAGES CXX)/" CMakeLists.txt
-          cp /tmp/CHANGELOG.md CHANGELOG.md
+          if [[ -n "$CANDIDATE_SHA" ]]; then
+            git fetch origin "$CANDIDATE_REF"
+            test "$(git rev-parse FETCH_HEAD)" = "$CANDIDATE_SHA"
+            test "$(git rev-parse "$CANDIDATE_SHA^")" = "$BASE_SHA"
+            if git rev-parse --verify --quiet "$CANDIDATE_SHA^2"; then
+              echo "::error::release candidate must have exactly one parent"
+              exit 1
+            fi
 
-      - name: Verify versions
-        if: env.DRY_RUN != 'true'
-        shell: bash
-        run: |
-          grep -Fx "project(papi VERSION $VERSION LANGUAGES CXX)" CMakeLists.txt
-          test "$(grep -Fc "## [$VERSION]" CHANGELOG.md)" -eq 1
-          test -s /tmp/release_body.md
-          git diff --check
+            mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA")
+            if [[ "${changed[*]}" != "CHANGELOG.md CMakeLists.txt" ]]; then
+              echo "::error::release candidate may change only CHANGELOG.md and CMakeLists.txt"
+              exit 1
+            fi
 
-      - name: Commit and push
-        id: commit
-        if: env.DRY_RUN != 'true'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CMakeLists.txt CHANGELOG.md
-          git commit -m "chore: release v$VERSION"
-          # Push the release commit to main and develop now so the build jobs can
-          # check it out. The tag is created only after all artifacts are validated
-          # (T-010), so a failed build leaves no public release tag.
-          git push --atomic origin HEAD:main HEAD:develop
+            git show "$CANDIDATE_SHA:CHANGELOG.md" > /tmp/candidate_CHANGELOG.md
+            DATE=$(VERSION="$VERSION" python - <<'PY'
+          import os
+          from pathlib import Path
+          from tools.release_changelog import render_version_notes
+
+          date, notes = render_version_notes(Path("/tmp/candidate_CHANGELOG.md").read_text(), os.environ["VERSION"])
+          Path("/tmp/release_body.md").write_text(notes)
+          print(date)
+          PY
+            )
+
+            git show "$BASE_SHA:CHANGELOG.md" > /tmp/base_CHANGELOG.md
+            git show "$BASE_SHA:CMakeLists.txt" > /tmp/expected_CMakeLists.txt
+            python tools/release_changelog.py \
+              --version "$VERSION" \
+              --date "$DATE" \
+              --repository "${{ github.repository }}" \
+              --input /tmp/base_CHANGELOG.md \
+              --output /tmp/expected_CHANGELOG.md \
+              --notes /tmp/expected_release_body.md
+            sed -E -i "s/^project\(papi VERSION [0-9]+\.[0-9]+\.[0-9]+ LANGUAGES CXX\)$/project(papi VERSION $VERSION LANGUAGES CXX)/" /tmp/expected_CMakeLists.txt
+            git show "$CANDIDATE_SHA:CMakeLists.txt" > /tmp/candidate_CMakeLists.txt
+            diff -u /tmp/candidate_CMakeLists.txt /tmp/expected_CMakeLists.txt
+            diff -u /tmp/candidate_CHANGELOG.md /tmp/expected_CHANGELOG.md
+            diff -u /tmp/expected_release_body.md /tmp/release_body.md
+            git checkout --detach "$CANDIDATE_SHA"
+          else
+            python tools/release_changelog.py \
+              --version "$VERSION" \
+              --date "$DATE" \
+              --repository "${{ github.repository }}" \
+              --output /tmp/CHANGELOG.md \
+              --notes /tmp/release_body.md
+            sed -E -i "s/^project\(papi VERSION [0-9]+\.[0-9]+\.[0-9]+ LANGUAGES CXX\)$/project(papi VERSION $VERSION LANGUAGES CXX)/" CMakeLists.txt
+            cp /tmp/CHANGELOG.md CHANGELOG.md
+            grep -Fx "project(papi VERSION $VERSION LANGUAGES CXX)" CMakeLists.txt
+            test "$(grep -Fc "## [$VERSION]" CHANGELOG.md)" -eq 1
+            test -s /tmp/release_body.md
+            git diff --check
+
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add CMakeLists.txt CHANGELOG.md
+            git commit -m "chore: release v$VERSION"
+            CANDIDATE_SHA=$(git rev-parse HEAD)
+            git push origin "$CANDIDATE_SHA:$CANDIDATE_REF"
+          fi
+
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Upload release notes
@@ -151,7 +245,7 @@ jobs:
 
   build-wheels:
     name: Build wheels (${{ matrix.python-tag }}-${{ matrix.platform }})
-    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.version != ''
+    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.published != 'true' && needs.release.outputs.version != ''
     needs: release
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -225,7 +319,7 @@ jobs:
 
   build-sdist:
     name: Build sdist
-    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.version != ''
+    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.published != 'true' && needs.release.outputs.version != ''
     needs: release
     runs-on: ubuntu-22.04
     timeout-minutes: 15
@@ -257,7 +351,7 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.version != ''
+    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.published != 'true' && needs.release.outputs.version != ''
     needs: [release, build-wheels, build-sdist]
     runs-on: ubuntu-22.04
     timeout-minutes: 10
@@ -296,15 +390,37 @@ jobs:
           test "$sdist_count" -eq 1
           test -s release-assets/release_body.md
 
-      - name: Create and push tag
+      - name: Atomically finalize release refs
         shell: bash
+        env:
+          BASE_SHA: ${{ needs.release.outputs.base_sha }}
+          CANDIDATE_REF: ${{ needs.release.outputs.candidate_ref }}
+          CANDIDATE_SHA: ${{ needs.release.outputs.sha }}
         run: |
           VERSION="${{ needs.release.outputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Tag is created only after all artifacts are verified (T-010).
-          git tag "v$VERSION"
-          git push origin "refs/tags/v$VERSION"
+          git fetch origin main develop --tags
+          MAIN_SHA=$(git rev-parse origin/main)
+          DEVELOP_SHA=$(git rev-parse origin/develop)
+          TAG_SHA=$(git rev-parse --verify --quiet "refs/tags/v$VERSION^{commit}" || true)
+          REMOTE_CANDIDATE_SHA=$(git ls-remote origin "$CANDIDATE_REF" | awk '{print $1}')
+
+          test "$REMOTE_CANDIDATE_SHA" = "$CANDIDATE_SHA"
+          if [[ -z "$TAG_SHA" ]]; then
+            test "$MAIN_SHA" = "$BASE_SHA"
+            test "$DEVELOP_SHA" = "$BASE_SHA"
+            # This is the only production-ref mutation. It occurs after all
+            # candidate artifact jobs pass and the complete set is verified.
+            git push --atomic origin \
+              "$CANDIDATE_SHA:refs/heads/main" \
+              "$CANDIDATE_SHA:refs/heads/develop" \
+              "$CANDIDATE_SHA:refs/tags/v$VERSION"
+          else
+            # A previous run finalized refs but failed while creating the GitHub
+            # Release. Rebuilding the same immutable candidate converges here.
+            test "$TAG_SHA" = "$CANDIDATE_SHA"
+            test "$MAIN_SHA" = "$CANDIDATE_SHA"
+            test "$DEVELOP_SHA" = "$CANDIDATE_SHA"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2

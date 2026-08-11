@@ -83,7 +83,9 @@ jobs:
         run: python tests/test_architecture_boundaries.py
 
       - name: Changelog tooling tests
-        run: python tools/test_release_changelog.py
+        run: |
+          python tools/test_release_changelog.py
+          python tools/test_release_transaction.py
 
   native-windows:
     name: Native (Windows)

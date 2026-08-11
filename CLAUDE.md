@@ -399,9 +399,11 @@ gh workflow run release.yml --repo EndstoneMC/papi --ref main -f version=X.Y.Z -
 gh workflow run release.yml --repo EndstoneMC/papi --ref main -f version=X.Y.Z -f dry_run=false
 ```
 
-The workflow validates the version, prepares the changelog, updates version declarations,
-creates the release commit and tag, builds Windows/Linux wheels and sdist from the tag,
-runs tests, and publishes the GitHub Release.
+The workflow validates the version and prepares an immutable, base-keyed release-candidate
+ref. It builds and runtime-validates Windows/Linux wheels and the sdist from that candidate,
+then atomically advances `main`, `develop`, and the production tag only after the complete
+artifact set is accepted. A retry reuses the candidate and can finish a GitHub Release after
+refs were already finalized without rewriting history.
 
 ### Final synchronization
 

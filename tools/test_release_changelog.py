@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from release_changelog import render_release  # noqa: E402
+from release_changelog import render_release, render_version_notes  # noqa: E402
 
 SAMPLE_CHANGELOG = """# Changelog
 
@@ -76,6 +76,27 @@ def test_release_notes_contain_subsections() -> None:
     assert "Parser edge case with nested braces" in notes
 
 
+def test_existing_version_recreates_identical_release_notes() -> None:
+    changelog, expected_notes = render_release(SAMPLE_CHANGELOG, "1.1.0", "2026-08-10", "EndstoneMC/papi")
+
+    date, notes = render_version_notes(changelog, "1.1.0")
+
+    assert date == "2026-08-10"
+    assert notes == expected_notes
+
+
+def test_existing_version_requires_one_dated_nonempty_section() -> None:
+    for source, version in (
+        (SAMPLE_CHANGELOG, "9.9.9"),
+        (SAMPLE_CHANGELOG.replace("## [1.0.0] - 2026-01-01", "## [1.0.0]"), "1.0.0"),
+    ):
+        try:
+            render_version_notes(source, version)
+            raise AssertionError("should have raised ValueError")
+        except ValueError:
+            pass
+
+
 def test_release_rejects_invalid_version() -> None:
     try:
         render_release(SAMPLE_CHANGELOG, "1.0", "2026-08-10", "EndstoneMC/papi")
@@ -129,6 +150,8 @@ def main() -> int:
         test_release_moves_unreleased_into_versioned_section,
         test_release_updates_comparison_links,
         test_release_notes_contain_subsections,
+        test_existing_version_recreates_identical_release_notes,
+        test_existing_version_requires_one_dated_nonempty_section,
         test_release_rejects_invalid_version,
         test_release_rejects_empty_unreleased,
         test_release_with_no_previous_version,

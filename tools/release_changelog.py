@@ -41,6 +41,37 @@ def split_subsections(value: str) -> tuple[str, list[tuple[str, str]]]:
     return preamble, sections
 
 
+def render_version_notes(source: str, version: str) -> tuple[str, str]:
+    """Return the recorded date and release notes for an existing version section."""
+    if not VERSION_RE.fullmatch(version):
+        raise ValueError(f"invalid version: {version}")
+
+    without_references = REFERENCE_RE.sub("", source).rstrip()
+    all_matches = list(SECTION_RE.finditer(without_references))
+    matches = [match for match in all_matches if match.group("version") == version]
+    if len(matches) != 1:
+        raise ValueError(f"CHANGELOG.md must contain exactly one [{version}] section")
+
+    match = matches[0]
+    if match.group("date") is None:
+        raise ValueError(f"CHANGELOG.md [{version}] section has no release date")
+    match_index = all_matches.index(match)
+    end = all_matches[match_index + 1].start() if match_index + 1 < len(all_matches) else len(without_references)
+    content = clean_block(without_references[match.end() : end])
+    if not content:
+        raise ValueError(f"CHANGELOG.md [{version}] section is empty")
+
+    _preamble, subsections = split_subsections(content)
+    notes_lines: list[str] = [f"## Release v{version}", ""]
+    for heading, body in subsections:
+        notes_lines.append(f"### {heading}")
+        notes_lines.append("")
+        if body:
+            notes_lines.append(body)
+            notes_lines.append("")
+    return match.group("date"), "\n".join(notes_lines).rstrip() + "\n"
+
+
 def render_release(source: str, version: str, date: str, repository: str) -> tuple[str, str]:
     if not VERSION_RE.fullmatch(version):
         raise ValueError(f"invalid version: {version}")
@@ -105,16 +136,9 @@ def render_release(source: str, version: str, date: str, repository: str) -> tup
 
     changelog = "\n".join(lines).rstrip() + "\n"
 
-    # Build release notes.
-    _preamble, subsections = split_subsections(unreleased_content)
-    notes_lines: list[str] = [f"## Release v{version}", ""]
-    for heading, body in subsections:
-        notes_lines.append(f"### {heading}")
-        notes_lines.append("")
-        if body:
-            notes_lines.append(body)
-            notes_lines.append("")
-    notes = "\n".join(notes_lines).rstrip() + "\n"
+    # Build release notes from the versioned section to keep initial preparation
+    # and retry-after-finalization output identical.
+    _recorded_date, notes = render_version_notes(changelog, version)
 
     return changelog, notes
 
