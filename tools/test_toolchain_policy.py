@@ -15,12 +15,14 @@ def test_cmake_requires_and_records_clang_20() -> None:
     assert "_toolchain_provenance.txt" in source
 
 
-def test_manylinux_uses_exact_clang_and_verified_runtime_sources() -> None:
+def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None:
     source = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     config = tomllib.loads(source)["tool"]["cibuildwheel"]["linux"]
     assert 'CC = "/usr/bin/clang-20"' in source
     assert 'CXX = "/usr/bin/clang++-20"' in source
-    assert "clang-20.1.8-3.el9" in source
+    assert "dnf install -y clang " in source
+    assert "clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}" in source
+    assert any("rpm -q --qf '%{VERSION}' clang | grep -E '^20\\.'" in command for command in config["before-all"])
     assert any("clang version 20\\." in command for command in config["before-all"])
     assert "llvm-project-20.1.8.src.tar.xz" in source
     assert "6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d" in source
