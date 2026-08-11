@@ -107,7 +107,10 @@ protected:
     // own reference so the service is the sole owner.
     std::shared_ptr<papi::PlaceholderExpansion> makeExpansion()
     {
-        return {create_(), [this](papi::PlaceholderExpansion *p) { destroy_(p); }};
+        auto deleter = [this](papi::PlaceholderExpansion *p) {
+            destroy_(p);
+        };
+        return {create_(), deleter};
     }
 
     std::shared_ptr<FakePlatform> platform_;
