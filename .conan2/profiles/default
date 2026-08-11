@@ -9,9 +9,8 @@ compiler={{ compiler }}
 compiler.version={{ detect_api.default_compiler_version(compiler, version) }}
 compiler.runtime=dynamic
 {% else %}
-{% set compiler, version, _ = detect_api.detect_clang_compiler() %}
-compiler={{ compiler }}
-compiler.version={{ detect_api.default_compiler_version(compiler, version) }}
+compiler=clang
+compiler.version=20
 compiler.libcxx=libc++
 {% endif %}
 compiler.cppstd=20
@@ -21,5 +20,5 @@ tools.cmake.cmaketoolchain:generator=Ninja
 {% if platform.system() == "Windows" %}
 tools.build:compiler_executables={"c": "clang-cl", "cpp": "clang-cl"}
 {% else %}
-tools.build:compiler_executables={"c": "clang", "cpp": "clang++"}
+tools.build:compiler_executables={"c": "/usr/bin/clang-20", "cpp": "/usr/bin/clang++-20"}
 {% endif %}

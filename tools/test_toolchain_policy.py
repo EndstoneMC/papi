@@ -33,12 +33,17 @@ def test_conan_and_pep517_backend_are_exactly_constrained() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
     recipe = (ROOT / "conanfile.py").read_text(encoding="utf-8")
+    profile = (ROOT / ".conan2" / "profiles" / "default").read_text(encoding="utf-8")
 
     assert '"scikit-build-core-conan==0.9.2"' in pyproject
     assert '"conan==2.30.0"' in pyproject
     assert '"pybind11==3.0.1"' in pyproject
     assert workflow.count("conan==2.30.0") == 3
     assert 'str(self.settings.compiler.version) != "20"' in recipe
+    assert "compiler.version=20" in profile
+    assert '"c": "/usr/bin/clang-20"' in profile
+    assert '"cpp": "/usr/bin/clang++-20"' in profile
+    assert "detect_clang_compiler" not in profile
 
 
 def test_wheel_validation_requires_compiler_provenance() -> None:
