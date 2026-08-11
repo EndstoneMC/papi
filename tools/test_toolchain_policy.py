@@ -20,9 +20,11 @@ def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None
     config = tomllib.loads(source)["tool"]["cibuildwheel"]["linux"]
     assert 'CC = "/usr/bin/clang-20"' in source
     assert 'CXX = "/usr/bin/clang++-20"' in source
-    assert "dnf install -y clang " in source
+    assert "dnf install -y clang20 " in source
     assert "clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}" in source
-    assert any("rpm -q --qf '%{VERSION}' clang | grep -E '^20\\.'" in command for command in config["before-all"])
+    assert any(
+        "rpm -q --qf '%{VERSION}' clang20 | grep -E '^20\\.'" in command for command in config["before-all"]
+    )
     assert any("clang version 20\\." in command for command in config["before-all"])
     assert "llvm-project-20.1.8.src.tar.xz" in source
     assert "6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d" in source

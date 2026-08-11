@@ -102,11 +102,11 @@ before-build = "pip install ninja wheel endstone==0.11.8"
 # of site-packages is needed.
 repair-wheel-command = "python tools/repair_wheel.py {wheel} {dest_dir}"
 before-all = [
-    "dnf install -y clang cmake ninja-build python3-pip wget xz",
+    "dnf install -y clang20 cmake ninja-build python3-pip wget xz",
     "/usr/bin/clang-20 --version | tee /tmp/toolchain-provenance.txt",
     "/usr/bin/clang-20 --version | grep -E 'clang version 20\\.'",
-    "rpm -q --qf 'clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\\n' clang | tee -a /tmp/toolchain-provenance.txt",
-    "rpm -q --qf '%{VERSION}' clang | grep -E '^20\\.'",
+    "rpm -q --qf 'clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\\n' clang20 | tee -a /tmp/toolchain-provenance.txt",
+    "rpm -q --qf '%{VERSION}' clang20 | grep -E '^20\\.'",
     "wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/llvm-project-20.1.8.src.tar.xz -O /tmp/llvm.tar.xz",
     "echo '6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d  /tmp/llvm.tar.xz' | sha256sum -c -",
     "tar xf /tmp/llvm.tar.xz -C /tmp",
