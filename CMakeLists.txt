@@ -93,6 +93,7 @@ endif ()
 # Compiled out of release wheels, where BUILD_TESTING is OFF.
 if (NOT BUILD_TESTING STREQUAL OFF)
     target_compile_definitions(_papi PRIVATE PAPI_TEST_BINDINGS)
+    target_include_directories(_papi PRIVATE ${PROJECT_SOURCE_DIR}/tests/cpp)
 endif ()
 
 install(TARGETS _papi DESTINATION "endstone_papi" COMPONENT python)

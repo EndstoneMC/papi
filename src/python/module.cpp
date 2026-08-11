@@ -21,6 +21,10 @@
 #include "python/expansion_trampoline.h"
 #include "python/gil_safe_proxy.h"
 
+#ifdef PAPI_TEST_BINDINGS
+#include "fake_player.h"
+#endif
+
 namespace py = pybind11;
 
 namespace {
@@ -285,6 +289,13 @@ public:
 
     std::size_t unregisterExpansions() { return service_->unregisterExpansions(*plugin_); }
 
+    [[nodiscard]] std::string setRelationalPlaceholders(std::string_view text) const
+    {
+        return service_->setRelationalPlaceholders(alice_, bob_, text);
+    }
+
+    void handlePlayerQuit() { service_->handlePlayerQuit(alice_); }
+
     [[nodiscard]] std::vector<std::string> warningMessages() const
     {
         std::vector<std::string> result;
@@ -300,6 +311,8 @@ private:
     std::shared_ptr<TestPlugin> plugin_;
     std::shared_ptr<TestPlatform> platform_;
     std::shared_ptr<papi::detail::PlaceholderApiImpl> service_;
+    papi::testing::FakePlayer alice_{"Alice", endstone::UUID{{1}}};
+    papi::testing::FakePlayer bob_{"Bob", endstone::UUID{{2}}};
 };
 #endif  // PAPI_TEST_BINDINGS
 
@@ -477,6 +490,10 @@ PYBIND11_MODULE(_papi, m)
              "Unregisters one expansion owned by the test plugin.")
         .def("unregister_expansions", &TestService::unregisterExpansions,
              "Unregisters every expansion owned by the test plugin.")
+        .def("set_relational_placeholders", &TestService::setRelationalPlaceholders, py::arg("text"),
+             "Dispatches relational placeholders with two in-memory test players.")
+        .def("handle_player_quit", &TestService::handlePlayerQuit,
+             "Dispatches player cleanup with an in-memory test player.")
         .def_property_readonly("warnings", &TestService::warningMessages,
                                "Every warning-or-above message logged by the service.");
 #endif

@@ -12,7 +12,6 @@ affect release artifacts. ``.gitignore`` already excludes ``*.pyd`` and ``*.so``
 from __future__ import annotations
 
 import shutil
-import sys
 from pathlib import Path
 
 # tests/python/conftest.py -> tests/ -> project root
@@ -32,25 +31,17 @@ def _find_built_module() -> Path | None:
 
 
 def _ensure_native_module() -> None:
-    # If the package is already importable (e.g. pip install -e), leave it alone.
-    try:
-        import endstone_papi._papi  # noqa: F401
-
-        return
-    except ImportError:
-        # Remove any partial import state so the copy below takes full effect.
-        # A failed ``from ._papi import ...`` in __init__.py can leave
-        # ``endstone_papi`` in sys.modules, preventing re-import after the copy.
-        sys.modules.pop("endstone_papi", None)
-        sys.modules.pop("endstone_papi._papi", None)
-
+    # Prefer the current dev build over an older importable copy left by a prior
+    # pytest run. Importing first would lock that stale .pyd on Windows and make
+    # newly-added test bindings invisible until it was copied manually.
     source = _find_built_module()
-    if source is None:
+    if source is not None:
+        dest = _PACKAGE_DIR / source.name
+        if not dest.exists() or source.stat().st_mtime > dest.stat().st_mtime:
+            shutil.copy2(source, dest)
         return
 
-    dest = _PACKAGE_DIR / source.name
-    if not dest.exists() or source.stat().st_mtime > dest.stat().st_mtime:
-        shutil.copy2(source, dest)
+    # With no dev build, an installed/editable package may still provide the module.
 
 
 _ensure_native_module()
