@@ -77,11 +77,16 @@ set_target_properties(_papi PROPERTIES
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # _papi.so has NEEDED libc++.so.1 and libc++abi.so.1 (standard SONAMEs), but
     # Endstone bundles these under auditwheel-hashed SONAMEs
-    # (libc++-<hash>.so.1.0, libc++abi-<hash>.so.1.0).  __init__.py creates
-    # standard-SONAME symlinks in this directory at runtime; the $ORIGIN RUNPATH
-    # lets the dynamic linker find them here instead of falling back to
-    # potentially incompatible system copies.
-    set_target_properties(_papi PROPERTIES INSTALL_RPATH "$ORIGIN")
+    # (libc++-<hash>.so.1.0, libc++abi-<hash>.so.1.0) in endstone.libs/.  We use
+    # DT_RPATH (via --disable-new-dtags) rather than DT_RUNPATH because DT_RPATH
+    # propagates to transitive dependencies: libc++'s own NEEDED entries (hashed
+    # SONAMEs) are resolved from $ORIGIN/../endstone.libs without needing
+    # preloading.  __init__.py creates standard-SONAME symlinks in this directory
+    # so the $ORIGIN entry resolves libc++.so.1 and libc++abi.so.1 to Endstone's
+    # copies.
+    set_target_properties(_papi PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../endstone.libs;$ORIGIN"
+            LINK_OPTIONS "-Wl,--disable-new-dtags")
 endif ()
 
 # Test-only bindings let Python regression tests construct internal types directly.
