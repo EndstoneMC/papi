@@ -11,6 +11,13 @@ Consumers load the service from Endstone rather than constructing it:
         print(service.set_placeholders(player, "{demo_name}"))
 """
 
+# Import endstone.plugin first so endstone._python (and its bundled libc++.so.1
+# on Linux manylinux wheels) is loaded into the process before _papi.  The
+# dynamic linker must resolve _papi's libc++ NEEDED entry before _papi's module
+# init runs; on hosts without a system libc++ (e.g. the manylinux smoke-test
+# runner) importing _papi first would segfault at load time.
+import endstone.plugin  # noqa: F401
+
 from ._papi import (
     SERVICE_NAME,
     ExpansionInfo,
