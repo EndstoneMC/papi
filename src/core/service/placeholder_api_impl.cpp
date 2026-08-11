@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <functional>
 #include <unordered_set>
 #include <utility>
 
@@ -43,16 +44,31 @@ unsigned &parseDepth()
 }
 
 /**
- * @brief Thread-local set of expansion generations currently being resolved.
- *
- * Used to detect cycles (A -> B -> A) before the depth budget is reached. A
- * generation is process-unique, so it cannot collide between different
- * registrations across services.
+ * @brief Keys an active registration by service and manager-local generation.
  */
-std::unordered_set<std::uint64_t> &activeGenerations()
+struct ActiveExpansionId {
+    const void *service;
+    std::uint64_t generation;
+
+    bool operator==(const ActiveExpansionId &) const = default;
+};
+
+struct ActiveExpansionIdHash {
+    [[nodiscard]] std::size_t operator()(const ActiveExpansionId &id) const noexcept
+    {
+        const auto service_hash = std::hash<const void *>{}(id.service);
+        const auto generation_hash = std::hash<std::uint64_t>{}(id.generation);
+        return service_hash ^ (generation_hash + 0x9e3779b9U + (service_hash << 6U) + (service_hash >> 2U));
+    }
+};
+
+/**
+ * @brief Thread-local set of expansion registrations used for cycle detection.
+ */
+std::unordered_set<ActiveExpansionId, ActiveExpansionIdHash> &activeExpansions()
 {
-    thread_local std::unordered_set<std::uint64_t> generations;
-    return generations;
+    thread_local std::unordered_set<ActiveExpansionId, ActiveExpansionIdHash> expansions;
+    return expansions;
 }
 
 /**
@@ -82,11 +98,11 @@ public:
  */
 class ActiveExpansionGuard {
 public:
-    explicit ActiveExpansionGuard(std::uint64_t generation) : generation_(generation)
+    ActiveExpansionGuard(const void *service, const std::uint64_t generation) : id_{service, generation}
     {
-        auto &active = activeGenerations();
-        if (!active.contains(generation)) {
-            active.insert(generation);
+        auto &active = activeExpansions();
+        if (!active.contains(id_)) {
+            active.insert(id_);
             pushed_ = true;
         }
     }
@@ -94,7 +110,7 @@ public:
     ~ActiveExpansionGuard()  // NOLINT(bugprone-exception-escape)
     {
         if (pushed_) {
-            activeGenerations().erase(generation_);
+            activeExpansions().erase(id_);
         }
     }
 
@@ -104,7 +120,7 @@ public:
     [[nodiscard]] bool reEntered() const noexcept { return !pushed_; }
 
 private:
-    std::uint64_t generation_;
+    ActiveExpansionId id_;
     bool pushed_ = false;
 };
 
@@ -208,7 +224,7 @@ public:
         }
 
         const auto generation = lease.getEntry()->getGeneration();
-        const ActiveExpansionGuard cycle_guard{generation};
+        const ActiveExpansionGuard cycle_guard{&service_, generation};
         if (cycle_guard.reEntered()) {
             // This expansion is already being resolved higher on the call stack:
             // a provider callback re-entered parsing and reached itself, directly
@@ -286,7 +302,7 @@ public:
         }
 
         const auto generation = entry->getGeneration();
-        const ActiveExpansionGuard cycle_guard{generation};
+        const ActiveExpansionGuard cycle_guard{&service_, generation};
         if (cycle_guard.reEntered()) {
             service_.logReentrancyError(entry->getInfo(), generation, "relational cycle detected");
             return std::nullopt;

@@ -199,6 +199,27 @@ TEST_F(ServiceTest, IndirectParseCycleIsBounded)
     EXPECT_TRUE(platform_->logger.anyContains("cycle detected"));
 }
 
+TEST_F(ServiceTest, NestedParsingAcrossServicesDoesNotAliasManagerLocalGenerations)
+{
+    auto other_service = std::make_shared<PlaceholderApiImpl>(platform_, papi_plugin_.getName());
+    auto outer = std::make_shared<FakeExpansion>("outer");
+    auto inner = std::make_shared<FakeExpansion>("inner");
+    outer->on_request = [other_service](const endstone::OfflinePlayer *, std::string_view) {
+        return other_service->setPlaceholders(nullptr, "{inner_x}");
+    };
+    inner->value = "leaf";
+
+    // Both managers assign generation one to their first registration. They are
+    // distinct active identities and must not be mistaken for a cycle.
+    ASSERT_TRUE(service_->registerExpansion(owner_, outer));
+    ASSERT_TRUE(other_service->registerExpansion(owner_, inner));
+
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{outer_x}"), "leaf");
+    EXPECT_EQ(outer->request_calls, 1);
+    EXPECT_EQ(inner->request_calls, 1);
+    EXPECT_FALSE(platform_->logger.anyContains("cycle detected"));
+}
+
 // T-005: a deep but non-cyclic chain that exceeds the depth budget is bounded.
 // The budget violation preserves the input text unchanged.
 TEST_F(ServiceTest, ParseDepthBudgetIsEnforced)
