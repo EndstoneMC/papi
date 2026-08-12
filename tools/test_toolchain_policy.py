@@ -28,11 +28,13 @@ def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None
     source = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     runtime_builder = (ROOT / "tools" / "build_linux_runtime.py").read_text(encoding="utf-8")
     config = tomllib.loads(source)["tool"]["cibuildwheel"]["linux"]
+    assert config["manylinux-x86_64-image"] == "ghcr.io/endstonemc/manylinux_2_31_x86_64"
     assert 'CC = "/usr/bin/clang-20"' in source
     assert 'CXX = "/usr/bin/clang++-20"' in source
-    assert "dnf install -y clang20 " in source
-    assert "clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}" in source
-    assert any("rpm -q --qf '%{VERSION}' clang20 | grep -E '^20\\.'" in command for command in config["before-all"])
+    assert "apt-get update -y -q" in source
+    assert "https://apt.llvm.org/llvm.sh" in source
+    assert any("/tmp/llvm.sh 20" in command for command in config["before-all"])
+    assert any("dpkg-query" in command and "clang-20" in command for command in config["before-all"])
     assert any("clang version 20\\." in command for command in config["before-all"])
     assert "python /project/tools/build_linux_runtime.py" in source
     assert '"20.1.8"' in runtime_builder
@@ -52,7 +54,7 @@ def test_conan_and_pep517_backend_are_exactly_constrained() -> None:
     assert '"scikit-build-core-conan==0.9.2"' in pyproject
     assert '"conan==2.30.0"' in pyproject
     assert '"pybind11==3.0.1"' in pyproject
-    assert workflow.count("conan==2.30.0") == 3
+    assert workflow.count("conan==2.30.0") == 2
     assert 'str(self.settings.compiler.version) != "20"' in recipe
     assert "compiler.version=20" in profile
     assert '"c": "/usr/bin/clang-20"' in profile
@@ -153,6 +155,13 @@ def test_repair_excludes_the_complete_endstone_owned_runtime_family() -> None:
     source = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")
     for soname in ("libc++.so.1", "libc++abi.so.1", "libunwind.so.1"):
         assert f'"--exclude",\n                "{soname}"' in source
+
+
+def test_repair_targets_endstone_manylinux_baseline_and_verifies_final_wheel() -> None:
+    source = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")
+    assert '_MANYLINUX_PLATFORM = "manylinux_2_31_x86_64"' in source
+    assert '"--plat",\n                _MANYLINUX_PLATFORM' in source
+    assert "inspect_wheel(final_wheels[0])" in source
 
 
 def main() -> int:

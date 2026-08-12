@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux wheels now advertise Endstone's `manylinux_2_31` baseline and fail packaging when their ELF requirements exceed it.
+
 ### Added
 
 - Native C++20 PlaceholderAPI framework with bracket parser, owner-aware

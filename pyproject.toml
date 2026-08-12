@@ -97,7 +97,7 @@ build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
 skip = ["*-musllinux*", "*_i686", "*-win32"]
 
 [tool.cibuildwheel.linux]
-manylinux-x86_64-image = "manylinux_2_34"
+manylinux-x86_64-image = "ghcr.io/endstonemc/manylinux_2_31_x86_64"
 environment = { CC = "/usr/bin/clang-20", CXX = "/usr/bin/clang++-20" }
 # Install Endstone before building so that tools/repair_wheel.py can discover
 # the exact hashed SONAMEs in endstone.libs/ and build standard-SONAME bridge
@@ -109,11 +109,13 @@ before-build = "pip install ninja wheel endstone==0.11.8"
 # the standard-SONAME bridges through tools/repair_wheel.py.
 repair-wheel-command = ""
 before-all = [
-    "dnf install -y clang20 cmake ninja-build python3-pip wget xz",
+    "apt-get update -y -q && apt-get install -y -q build-essential lsb-release wget software-properties-common gnupg python3-pip xz-utils",
+    "wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 20",
+    "apt-get install -y -q clang-tools-20",
+    "python3 -m pip install 'cmake==3.31.6' 'ninja==1.11.1.4'",
     "/usr/bin/clang-20 --version | tee /tmp/toolchain-provenance.txt",
     "/usr/bin/clang-20 --version | grep -E 'clang version 20\\.'",
-    "rpm -q --qf 'clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\\n' clang20 | tee -a /tmp/toolchain-provenance.txt",
-    "rpm -q --qf '%{VERSION}' clang20 | grep -E '^20\\.'",
+    "dpkg-query -W -f='clang_nvr=${Package}-${Version}-${Architecture}\\n' clang-20 | tee -a /tmp/toolchain-provenance.txt",
     "python /project/tools/build_linux_runtime.py",
 ]
 

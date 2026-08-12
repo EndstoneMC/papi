@@ -34,18 +34,21 @@ RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 def _assert_isolated_sdist_flow(source: str) -> None:
     assert "Stage only the sdist archive" in source or "Verify and isolate sdist archive" in source
     assert "cp dist/*.tar.gz /tmp/papi-sdist-input/" in source
-    assert "python -m venv /tmp/papi-sdist-build-env" in source
-    assert "cd /tmp/papi-sdist-build" in source
+    assert "tar -xf /tmp/papi-sdist-input/*.tar.gz" in source
     assert "/tmp/papi-sdist-input/*.tar.gz" in source
     assert "python -m venv /tmp/papi-sdist-smoke-env" in source
     assert "cd /tmp/papi-sdist-smoke" in source
     assert 'python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py"' in source
-    assert "Build checkout wheel through shared backend" in source
-    assert "tar --wildcards -xOf /tmp/papi-sdist-input/*.tar.gz" in source
+    assert "Build checkout and isolated sdist wheels at Endstone baseline" in source
+    assert source.count("python -m cibuildwheel --platform linux") >= 2
+    assert "CIBW_CONTAINER_ENGINE" in source
+    assert "ghcr.io/endstonemc/manylinux_2_31_x86_64" in source
     assert "Verify checkout and sdist wheel runtime contracts" in source
     assert "tools/verify_linux_wheel.py" in source
     assert "--compare" in source
-    assert "/tmp/papi-sdist-build-env/bin/python -m auditwheel show" in source
+    assert "--auditwheel" in source
+    assert "export PATH=/opt/python/cp312-cp312/bin:$PATH" in source
+    assert '"endstone==0.11.8"' in source
     assert 'ldd "$module"' in source
     assert "native import unexpectedly succeeded without Endstone libc++" in source
     assert "assert not any('=> /usr/' in line for line in runtime)" in source
@@ -126,6 +129,23 @@ def test_runtime_bundle_check_ignores_empty_directory_but_rejects_cpp_runtime_fi
     assert verify_linux_wheel._is_papi_owned_cpp_runtime("endstone_papi.libs/libunwind-123.so.1")
 
 
+def test_manylinux_contract_rejects_an_undertagged_wheel() -> None:
+    verify_linux_wheel._assert_platform_compatible("manylinux_2_31_x86_64", (2, 31))
+    try:
+        verify_linux_wheel._assert_platform_compatible("manylinux_2_17_x86_64", (2, 31))
+    except AssertionError as error:
+        assert "GLIBC_2.31" in str(error)
+    else:
+        raise AssertionError("undertagged wheel was accepted")
+
+
+def test_filename_and_wheel_metadata_platform_parsing() -> None:
+    wheel = Path("endstone_papi-1.0.0-cp312-cp312-manylinux_2_31_x86_64.whl")
+    assert verify_linux_wheel._filename_platforms(wheel) == {"manylinux_2_31_x86_64"}
+    metadata = "Wheel-Version: 1.0\nTag: cp312-cp312-manylinux_2_31_x86_64\n"
+    assert verify_linux_wheel._wheel_metadata_platforms(metadata) == {"manylinux_2_31_x86_64"}
+
+
 def test_ci_builds_and_smokes_only_the_copied_archive() -> None:
     source = BUILD_WORKFLOW.read_text(encoding="utf-8")
     sdist_job = source[source.index("  sdist:") :]
@@ -136,7 +156,9 @@ def test_release_accepts_sdist_before_publish_finalization() -> None:
     source = RELEASE_WORKFLOW.read_text(encoding="utf-8")
     sdist_job = source[source.index("  build-sdist:") : source.index("  publish:")]
     _assert_isolated_sdist_flow(sdist_job)
-    assert sdist_job.index("Build wheel from isolated sdist archive") < sdist_job.index("actions/upload-artifact")
+    assert sdist_job.index("Build checkout and isolated sdist wheels at Endstone baseline") < sdist_job.index(
+        "actions/upload-artifact"
+    )
     assert sdist_job.index("Runtime smoke test from isolated sdist-built wheel") < sdist_job.index(
         "actions/upload-artifact"
     )

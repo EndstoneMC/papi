@@ -32,6 +32,7 @@ _LIB_MAP = {
     "libc++abi.so.1": "libc++abi-",
 }
 _CPP_RUNTIME_PREFIXES = ("libc++", "libc++abi", "libunwind")
+_MANYLINUX_PLATFORM = "manylinux_2_31_x86_64"
 
 
 def _find_backend_tool(name: str) -> str | None:
@@ -98,6 +99,8 @@ def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
                 "-m",
                 "auditwheel",
                 "repair",
+                "--plat",
+                _MANYLINUX_PLATFORM,
                 "--exclude",
                 "libc++.so.1",
                 "--exclude",
@@ -170,6 +173,9 @@ def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
         final_wheels = list(final_dir.glob("*.whl"))
         if len(final_wheels) != 1:
             sys.exit(f"repair_wheel: expected one final wheel in {final_dir}, got {final_wheels}")
+        from tools.verify_linux_wheel import inspect_wheel
+
+        inspect_wheel(final_wheels[0])
         final = dest_dir / final_wheels[0].name
         if final.exists():
             sys.exit(f"repair_wheel: destination already exists: {final}")

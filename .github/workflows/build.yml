@@ -270,6 +270,13 @@ jobs:
           ), 'endstone dependency not declared in wheel METADATA'
           print(f'OK: {len(names)} files in {whl.name}')
           "
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            docker run --rm \
+              -v "$GITHUB_WORKSPACE:/project" \
+              -w /project \
+              ghcr.io/endstonemc/manylinux_2_31_x86_64 \
+              bash -lc 'export PATH=/opt/python/cp312-cp312/bin:$PATH; python -m pip install "auditwheel==6.4.2" "endstone==0.11.8" "patchelf==0.17.2.4" && python tools/verify_linux_wheel.py wheelhouse/*.whl --auditwheel'
+          fi
 
       - name: Set up Python for runtime test
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -310,7 +317,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install build
-        run: python -m pip install build patchelf
+        run: python -m pip install build cibuildwheel==3.4.1
 
       - name: Build sdist
         run: python -m build --sdist
@@ -337,45 +344,36 @@ jobs:
           cp dist/*.tar.gz /tmp/papi-sdist-input/
           test "$(find /tmp/papi-sdist-input -maxdepth 1 -type f | wc -l)" -eq 1
 
-      - name: Install Clang 20
-        run: |
-          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-          chmod +x /tmp/llvm.sh
-          sudo /tmp/llvm.sh 20
-          sudo ln -sf /usr/bin/clang-20 /usr/local/bin/clang
-          sudo ln -sf /usr/bin/clang++-20 /usr/local/bin/clang++
-          clang --version | grep -E "clang version 20\\."
-          tar --wildcards -xOf /tmp/papi-sdist-input/*.tar.gz '*/tools/build_linux_runtime.py' > /tmp/build_linux_runtime.py
-          sudo /usr/bin/python3 /tmp/build_linux_runtime.py
-
-      - name: Build checkout wheel through shared backend
+      - name: Extract isolated sdist archive
         shell: bash
         run: |
-          CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
-            python -m build --wheel -o /tmp/papi-checkout-wheel
+          tar -xf /tmp/papi-sdist-input/*.tar.gz -C /tmp/papi-sdist-build --strip-components=1
 
-      - name: Install Conan and build tools
-        run: |
-          python -m venv /tmp/papi-sdist-build-env
-          /tmp/papi-sdist-build-env/bin/python -m pip install \
-            "conan==2.30.0" cmake ninja "scikit-build-core-conan==0.9.2" "pybind11==3.0.1" \
-            "auditwheel==6.4.2" "endstone==0.11.8" "patchelf==0.17.2.4" "wheel==0.45.1"
-
-      - name: Build wheel from isolated sdist archive
+      - name: Build checkout and isolated sdist wheels at Endstone baseline
         shell: bash
+        env:
+          CIBW_CONTAINER_ENGINE: "docker; create_args: --volume ${{ github.workspace }}/.conan2:/project/.conan2"
         run: |
-          cd /tmp/papi-sdist-build
-          CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
-            /tmp/papi-sdist-build-env/bin/pip wheel --no-deps --no-build-isolation \
-            /tmp/papi-sdist-input/*.tar.gz -w "$GITHUB_WORKSPACE/wheelhouse/"
+          CIBW_BUILD=cp312-manylinux_x86_64 python -m cibuildwheel --platform linux \
+            --output-dir /tmp/papi-checkout-wheel .
+          CIBW_BUILD=cp312-manylinux_x86_64 python -m cibuildwheel --platform linux \
+            --output-dir "$GITHUB_WORKSPACE/wheelhouse" /tmp/papi-sdist-build
+
+      - name: Reclaim Conan home
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" .conan2
 
       - name: Verify checkout and sdist wheel runtime contracts
         shell: bash
         run: |
           sdist_wheel="$(find wheelhouse -maxdepth 1 -name '*.whl' -print -quit)"
           checkout_wheel="$(find /tmp/papi-checkout-wheel -maxdepth 1 -name '*.whl' -print -quit)"
-          python tools/verify_linux_wheel.py "$sdist_wheel" --compare "$checkout_wheel"
-          /tmp/papi-sdist-build-env/bin/python -m auditwheel show "$sdist_wheel"
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/project" \
+            -v /tmp/papi-checkout-wheel:/checkout-wheel:ro \
+            -w /project \
+            ghcr.io/endstonemc/manylinux_2_31_x86_64 \
+            bash -lc 'export PATH=/opt/python/cp312-cp312/bin:$PATH; python -m pip install "auditwheel==6.4.2" "endstone==0.11.8" "patchelf==0.17.2.4" && python tools/verify_linux_wheel.py wheelhouse/*.whl --compare /checkout-wheel/*.whl --auditwheel'
 
       - name: Runtime smoke test from isolated sdist-built wheel
         shell: bash
