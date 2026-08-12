@@ -107,6 +107,7 @@ class MyPlugin(Plugin):
     soft_depend = ["papi"]
 
     def on_enable(self):
+        # The typed loader also rejects an unrelated service shadowing PAPI's name.
         service = PlaceholderAPI.load(self.server.service_manager)
         if service is None or not service.active:
             return

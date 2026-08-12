@@ -13,6 +13,7 @@ add_executable(papi_test
         cpp/test_public_api.cpp
         cpp/test_relational.cpp
         cpp/test_service.cpp
+        cpp/test_service_publication.cpp
         cpp/test_version.cpp
 )
 

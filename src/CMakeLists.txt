@@ -7,6 +7,7 @@ add_library(papi_core STATIC
         core/service/placeholder_api_impl.cpp
         core/diagnostics/error_throttle.cpp
         platform/endstone/bootstrap.cpp
+        platform/endstone/service_publication.cpp
         platform/endstone/server_platform.cpp
 )
 

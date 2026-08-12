@@ -19,6 +19,7 @@
 
 #include "core/deprecation.h"
 #include "platform/endstone/bootstrap.h"
+#include "platform/endstone/service_publication.h"
 #include "python/expansion_trampoline.h"
 #include "python/gil_safe_proxy.h"
 
@@ -396,11 +397,9 @@ PYBIND11_MODULE(_papi, m)
         m, "PlaceholderAPI", "Resolves placeholders through registered expansions.", py::is_final())
         .def_static(
             "load",
-            [](const endstone::ServiceManager &manager) {
-                return manager.load<papi::PlaceholderAPI>(std::string(papi::PlaceholderAPI::ServiceName));
-            },
+            [](const endstone::ServiceManager &manager) { return papi::detail::ServicePublication::load(manager); },
             py::arg("service_manager"),
-            "Loads the typed PlaceholderAPI service. Returns None when PAPI is unavailable.")
+            "Loads the active native PlaceholderAPI service. Returns None when it is unavailable or shadowed.")
         .def_property_readonly("active", &papi::PlaceholderAPI::isActive,
                                "Whether this service is still usable. False once PAPI has been disabled.")
         .def("set_placeholders", &papi::PlaceholderAPI::setPlaceholders, py::arg("player"), py::arg("text"),

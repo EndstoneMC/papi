@@ -7,6 +7,8 @@
 #include <endstone/plugin/service_priority.h>
 #include <endstone/server.h>
 
+#include "platform/endstone/service_publication.h"
+
 namespace papi::detail {
 
 PapiBootstrap::PapiBootstrap() = default;
@@ -26,8 +28,10 @@ bool PapiBootstrap::start(endstone::Plugin &plugin)
     platform_ = std::make_shared<ServerPlatform>(plugin.getServer(), plugin.getLogger());
     service_ = std::make_shared<PlaceholderApiImpl>(platform_, plugin.getName());
 
-    plugin.getServer().getServiceManager().registerService(std::string(PlaceholderAPI::ServiceName), service_, plugin,
-                                                           endstone::ServicePriority::Normal);
+    auto &service_manager = plugin.getServer().getServiceManager();
+    service_manager.registerService(std::string(PlaceholderAPI::ServiceName), service_, plugin,
+                                    endstone::ServicePriority::Normal);
+    ServicePublication::publish(service_manager, service_);
     registerListeners(plugin);
     return true;
 }
@@ -65,10 +69,12 @@ void PapiBootstrap::stop()
     service_->beginShutdown();
 
     if (plugin_) {
-        plugin_->getServer().getServiceManager().unregister(std::string(PlaceholderAPI::ServiceName), *service_);
+        auto &service_manager = plugin_->getServer().getServiceManager();
+        service_manager.unregister(std::string(PlaceholderAPI::ServiceName), *service_);
+        ServicePublication::withdraw(service_manager, *service_);
         // Defensive: PAPI registers no other service, but this guarantees the manager
         // holds nothing owned by this plugin.
-        plugin_->getServer().getServiceManager().unregisterAll(*plugin_);
+        service_manager.unregisterAll(*plugin_);
     }
 
     service_->finishShutdown();

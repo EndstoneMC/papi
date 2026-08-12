@@ -145,7 +145,7 @@ class PlaceholderAPI(Service):
 
     @staticmethod
     def load(service_manager: ServiceManager) -> PlaceholderAPI | None:
-        """Load the typed service, or None when PAPI is unavailable."""
+        """Load the active native service, or None when it is unavailable or shadowed."""
 
     @property
     def active(self) -> bool:

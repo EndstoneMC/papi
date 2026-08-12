@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Python consumers can now load a correctly typed `PlaceholderAPI` from
   Endstone's service manager without relying on unavailable cross-module RTTI
-  downcasting.
+  downcasting or trusting an arbitrary provider with the same service name.
 - Linux wheels now establish their Endstone-owned C++ runtime dependency with
   build-time standard-SONAME bridge DSOs, avoiding both import-time package
   mutation and direct hashed-SONAME loader crashes.
