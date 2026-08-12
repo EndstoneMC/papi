@@ -32,6 +32,14 @@ _LIB_MAP = {
 }
 
 
+def _find_backend_tool(name: str) -> str | None:
+    """Find a tool on PATH or beside the active PEP 517 backend interpreter."""
+    if found := shutil.which(name):
+        return found
+    candidate = Path(sys.executable).parent / name
+    return str(candidate) if candidate.is_file() else None
+
+
 def _find_endstone_hashed_sonames() -> dict[str, str]:
     """Return ``{standard_soname: hashed_soname}`` from Endstone's endstone.libs/."""
     try:
@@ -56,7 +64,7 @@ def _find_endstone_hashed_sonames() -> dict[str, str]:
 def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
     """Repair one Linux wheel and return the final wheel path."""
     dest_dir.mkdir(parents=True, exist_ok=True)
-    patchelf = shutil.which("patchelf")
+    patchelf = _find_backend_tool("patchelf")
     if patchelf is None:
         sys.exit("repair_wheel: patchelf not found on PATH")
     compiler_name = os.environ.get("CC", "clang")
@@ -70,8 +78,12 @@ def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
     # Step 1: Run auditwheel with --exclude to avoid bundling a duplicate libc++.
     with tempfile.TemporaryDirectory(prefix="papi-repair-") as repair_tmp:
         repair_dir = Path(repair_tmp)
+        # Use the backend environment even when its bin directory is not
+        # inherited in PATH (for example, absolute-path pip invocation).
         subprocess.check_call(
             [
+                sys.executable,
+                "-m",
                 "auditwheel",
                 "repair",
                 "--exclude",

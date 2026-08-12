@@ -96,6 +96,43 @@ def test_repair_accepts_vendor_prefixed_clang_20_and_rejects_other_majors() -> N
                 raise AssertionError("repair test did not reach a terminal result")
 
 
+def test_repair_uses_backend_interpreter_and_finds_adjacent_tools() -> None:
+    with TemporaryDirectory() as temporary_directory:
+        scripts = Path(temporary_directory)
+        interpreter = scripts / "python"
+        patchelf = scripts / "patchelf"
+        interpreter.touch()
+        patchelf.touch()
+
+        with (
+            mock.patch.object(repair_wheel.sys, "executable", str(interpreter)),
+            mock.patch.object(repair_wheel.shutil, "which", return_value=None),
+        ):
+            assert repair_wheel._find_backend_tool("patchelf") == str(patchelf)
+
+        calls: list[list[str]] = []
+
+        def record_call(command: list[str]) -> None:
+            calls.append(command)
+            raise RuntimeError("captured")
+
+        with (
+            mock.patch.object(repair_wheel.sys, "executable", str(interpreter)),
+            mock.patch.object(repair_wheel, "_find_backend_tool", return_value=str(patchelf)),
+            mock.patch.object(repair_wheel.shutil, "which", return_value="/usr/bin/clang-20"),
+            mock.patch.object(repair_wheel.subprocess, "check_output", return_value="clang version 20.1.8\n"),
+            mock.patch.object(repair_wheel.subprocess, "check_call", side_effect=record_call),
+        ):
+            try:
+                repair_wheel.repair_wheel(Path("input.whl"), scripts / "output")
+            except RuntimeError as error:
+                assert str(error) == "captured"
+            else:
+                raise AssertionError("repair command was not invoked")
+
+        assert calls[0][:4] == [str(interpreter), "-m", "auditwheel", "repair"]
+
+
 def main() -> int:
     tests = [value for name, value in globals().items() if name.startswith("test_") and callable(value)]
     for test in tests:
