@@ -1,8 +1,12 @@
 """Static regressions for ABI-sensitive compiler and backend provenance."""
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import mock
 
 import tomllib
+
+import tools.repair_wheel
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,7 +61,34 @@ def test_wheel_validation_requires_compiler_provenance() -> None:
 
     repair = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")
     assert 'os.environ.get("CC", "clang")' in repair
-    assert 'startswith("clang version 20.")' in repair
+    assert 'r"\\bclang version 20\\."' in repair
+
+
+def test_repair_accepts_vendor_prefixed_clang_20_and_rejects_other_majors() -> None:
+    versions = [
+        ("clang version 20.1.8", False),
+        ("Ubuntu clang version 20.1.8 (++vendor)", False),
+        ("Ubuntu clang version 19.1.7", True),
+        ("Ubuntu clang version 200.0.0", True),
+    ]
+
+    for version, rejected in versions:
+        with TemporaryDirectory() as temporary_directory:
+            with (
+                mock.patch.object(tools.repair_wheel.shutil, "which", return_value="/usr/bin/clang-20"),
+                mock.patch.object(tools.repair_wheel.subprocess, "check_output", return_value=f"{version}\n"),
+                mock.patch.object(tools.repair_wheel.subprocess, "check_call", side_effect=RuntimeError("accepted")),
+            ):
+                try:
+                    tools.repair_wheel.repair_wheel(Path("input.whl"), Path(temporary_directory) / "output")
+                except SystemExit as error:
+                    if not rejected:
+                        raise AssertionError(f"unexpected rejection for {version!r}: {error}") from error
+                except RuntimeError as error:
+                    if rejected or str(error) != "accepted":
+                        raise
+                else:
+                    raise AssertionError("repair test did not reach a terminal result")
 
 
 def main() -> int:

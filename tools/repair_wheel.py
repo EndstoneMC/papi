@@ -18,6 +18,7 @@ and the wheel build fails.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -63,7 +64,7 @@ def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
     if compiler is None:
         sys.exit(f"repair_wheel: compiler {compiler_name!r} not found")
     compiler_version = subprocess.check_output([compiler, "--version"], text=True).splitlines()[0]
-    if not compiler_version.startswith("clang version 20."):
+    if re.search(r"\bclang version 20\.", compiler_version) is None:
         sys.exit(f"repair_wheel: Clang 20 is required, got {compiler_version}")
 
     # Step 1: Run auditwheel with --exclude to avoid bundling a duplicate libc++.
