@@ -49,6 +49,8 @@ def main() -> int:
                 "-DLIBCXX_CXX_ABI=libcxxabi",
                 "-DLIBCXXABI_USE_LLVM_UNWINDER=OFF",
                 "-DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF",
+                "-DLIBCXX_INCLUDE_TESTS=OFF",
+                "-DLIBCXXABI_INCLUDE_TESTS=OFF",
             ]
         )
         subprocess.check_call(["cmake", "--build", str(build), "--target", "install-cxx", "install-cxxabi", "--"])

@@ -38,6 +38,8 @@ def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None
     assert '"20.1.8"' in runtime_builder
     assert "6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d" in runtime_builder
     assert "-DLIBCXXABI_USE_LLVM_UNWINDER=OFF" in runtime_builder
+    assert "-DLIBCXX_INCLUDE_TESTS=OFF" in runtime_builder
+    assert "-DLIBCXXABI_INCLUDE_TESTS=OFF" in runtime_builder
     assert "clang version (1[89]|[2-9][0-9])" not in source
 
 
