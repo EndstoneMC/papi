@@ -3,10 +3,17 @@
 import importlib.util
 import sys
 import tempfile
+import types
 from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
+try:
+    import scikit_build_core_conan  # noqa: F401
+except ModuleNotFoundError:
+    backend_dependency = types.ModuleType("scikit_build_core_conan")
+    backend_dependency.build = types.SimpleNamespace(build_wheel=lambda *_args: "unused.whl")
+    sys.modules[backend_dependency.__name__] = backend_dependency
 BACKEND_SPEC = importlib.util.spec_from_file_location("papi_build_backend", ROOT / "papi_build_backend.py")
 assert BACKEND_SPEC is not None and BACKEND_SPEC.loader is not None
 papi_build_backend = importlib.util.module_from_spec(BACKEND_SPEC)

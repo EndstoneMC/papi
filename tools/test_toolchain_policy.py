@@ -149,6 +149,12 @@ def test_repair_rejects_only_papi_owned_cpp_runtime_libraries() -> None:
     assert repair_wheel._bundled_cpp_runtimes(names) == names[2:]
 
 
+def test_repair_excludes_the_complete_endstone_owned_runtime_family() -> None:
+    source = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")
+    for soname in ("libc++.so.1", "libc++abi.so.1", "libunwind.so.1"):
+        assert f'"--exclude",\n                "{soname}"' in source
+
+
 def main() -> int:
     tests = [value for name, value in globals().items() if name.startswith("test_") and callable(value)]
     for test in tests:

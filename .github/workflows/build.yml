@@ -388,10 +388,11 @@ jobs:
           ldd "$module" | tee /tmp/papi-sdist-ldd.txt
           grep -F 'endstone_papi/libc++.so.1' /tmp/papi-sdist-ldd.txt
           grep -F 'endstone_papi/libc++abi.so.1' /tmp/papi-sdist-ldd.txt
+          grep -F 'endstone.libs/libunwind-' /tmp/papi-sdist-ldd.txt
           python -c "
           from pathlib import Path
           lines = Path('/tmp/papi-sdist-ldd.txt').read_text().splitlines()
-          runtime = [line for line in lines if 'libc++.so' in line or 'libc++abi.so' in line]
+          runtime = [line for line in lines if any(name in line for name in ('libc++.so', 'libc++abi.so', 'libunwind.so'))]
           assert runtime, lines
           assert not any('=> /usr/' in line for line in runtime), runtime
           "

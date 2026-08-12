@@ -102,6 +102,8 @@ def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
                 "libc++.so.1",
                 "--exclude",
                 "libc++abi.so.1",
+                "--exclude",
+                "libunwind.so.1",
                 "-w",
                 str(repair_dir),
                 str(wheel),
