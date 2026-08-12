@@ -161,6 +161,7 @@ def test_repair_targets_endstone_manylinux_baseline_and_verifies_final_wheel() -
     source = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")
     assert '_MANYLINUX_PLATFORM = "manylinux_2_31_x86_64"' in source
     assert '"--plat",\n                _MANYLINUX_PLATFORM' in source
+    assert '"--only-plat"' in source
     assert "inspect_wheel(final_wheels[0])" in source
 
 

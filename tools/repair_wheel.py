@@ -101,6 +101,7 @@ def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
                 "repair",
                 "--plat",
                 _MANYLINUX_PLATFORM,
+                "--only-plat",
                 "--exclude",
                 "libc++.so.1",
                 "--exclude",
