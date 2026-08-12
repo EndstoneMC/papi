@@ -114,12 +114,7 @@ before-all = [
     "/usr/bin/clang-20 --version | grep -E 'clang version 20\\.'",
     "rpm -q --qf 'clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\\n' clang20 | tee -a /tmp/toolchain-provenance.txt",
     "rpm -q --qf '%{VERSION}' clang20 | grep -E '^20\\.'",
-    "wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/llvm-project-20.1.8.src.tar.xz -O /tmp/llvm.tar.xz",
-    "echo '6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d  /tmp/llvm.tar.xz' | sha256sum -c -",
-    "tar xf /tmp/llvm.tar.xz -C /tmp",
-    "cmake -B /tmp/libcxx-build -S /tmp/llvm-project-20.1.8.src/runtimes -G Ninja -DCMAKE_C_COMPILER=/usr/bin/clang-20 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-20 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi' -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXXABI_USE_LLVM_UNWINDER=OFF -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF",
-    "cmake --build /tmp/libcxx-build --target install-cxx install-cxxabi -- -j$(nproc)",
-    "rm -rf /tmp/llvm.tar.xz /tmp/llvm-project-20.1.8.src /tmp/libcxx-build",
+    "python /project/tools/build_linux_runtime.py",
 ]
 
 [tool.cibuildwheel.windows]

@@ -26,6 +26,7 @@ def test_cmake_requires_and_records_clang_20() -> None:
 
 def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None:
     source = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    runtime_builder = (ROOT / "tools" / "build_linux_runtime.py").read_text(encoding="utf-8")
     config = tomllib.loads(source)["tool"]["cibuildwheel"]["linux"]
     assert 'CC = "/usr/bin/clang-20"' in source
     assert 'CXX = "/usr/bin/clang++-20"' in source
@@ -33,8 +34,10 @@ def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None
     assert "clang_nvr=%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}" in source
     assert any("rpm -q --qf '%{VERSION}' clang20 | grep -E '^20\\.'" in command for command in config["before-all"])
     assert any("clang version 20\\." in command for command in config["before-all"])
-    assert "llvm-project-20.1.8.src.tar.xz" in source
-    assert "6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d" in source
+    assert "python /project/tools/build_linux_runtime.py" in source
+    assert '"20.1.8"' in runtime_builder
+    assert "6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d" in runtime_builder
+    assert "-DLIBCXXABI_USE_LLVM_UNWINDER=OFF" in runtime_builder
     assert "clang version (1[89]|[2-9][0-9])" not in source
 
 
@@ -131,6 +134,17 @@ def test_repair_uses_backend_interpreter_and_finds_adjacent_tools() -> None:
                 raise AssertionError("repair command was not invoked")
 
         assert calls[0][:4] == [str(interpreter), "-m", "auditwheel", "repair"]
+
+
+def test_repair_rejects_only_papi_owned_cpp_runtime_libraries() -> None:
+    names = [
+        "endstone_papi.libs/",
+        "endstone_papi.libs/libother-123.so.2",
+        "endstone_papi.libs/libc++-123.so.1.0",
+        "endstone_papi.libs/libc++abi-123.so.1.0",
+        "endstone_papi.libs/libunwind-123.so.1",
+    ]
+    assert repair_wheel._bundled_cpp_runtimes(names) == names[2:]
 
 
 def main() -> int:

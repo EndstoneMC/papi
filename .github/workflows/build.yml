@@ -324,7 +324,7 @@ jobs:
           t = tarfile.open(sdist)
           names = t.getnames()
           for required in ['module.cpp', 'gil_safe_proxy.cpp', 'expansion_trampoline.cpp',
-                           'bootstrap.cpp', 'placeholder_api_impl.cpp']:
+                           'bootstrap.cpp', 'placeholder_api_impl.cpp', 'build_linux_runtime.py']:
               assert any(required in n for n in names), f'{required} missing from sdist'
           print(f'OK: sdist contains all native sources')
           "
@@ -342,10 +342,11 @@ jobs:
           wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x /tmp/llvm.sh
           sudo /tmp/llvm.sh 20
-          sudo apt-get install -y libc++-20-dev libc++abi-20-dev
           sudo ln -sf /usr/bin/clang-20 /usr/local/bin/clang
           sudo ln -sf /usr/bin/clang++-20 /usr/local/bin/clang++
           clang --version | grep -E "clang version 20\\."
+          tar -xOf /tmp/papi-sdist-input/*.tar.gz '*/tools/build_linux_runtime.py' > /tmp/build_linux_runtime.py
+          sudo /usr/bin/python3 /tmp/build_linux_runtime.py
 
       - name: Build checkout wheel through shared backend
         shell: bash

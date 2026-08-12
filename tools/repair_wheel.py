@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 # Standard SONAME -> prefix that auditwheel uses for the hashed rename.
@@ -30,6 +31,7 @@ _LIB_MAP = {
     "libc++.so.1": "libc++-",
     "libc++abi.so.1": "libc++abi-",
 }
+_CPP_RUNTIME_PREFIXES = ("libc++", "libc++abi", "libunwind")
 
 
 def _find_backend_tool(name: str) -> str | None:
@@ -38,6 +40,16 @@ def _find_backend_tool(name: str) -> str | None:
         return found
     candidate = Path(sys.executable).parent / name
     return str(candidate) if candidate.is_file() else None
+
+
+def _bundled_cpp_runtimes(names: list[str]) -> list[str]:
+    return [
+        name
+        for name in names
+        if name.startswith("endstone_papi.libs/")
+        and Path(name).name.startswith(_CPP_RUNTIME_PREFIXES)
+        and ".so" in Path(name).name
+    ]
 
 
 def _find_endstone_hashed_sonames() -> dict[str, str]:
@@ -101,6 +113,11 @@ def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
         if len(repaired_wheels) != 1:
             sys.exit(f"repair_wheel: expected one repaired wheel in {repair_dir}, got {repaired_wheels}")
         repaired = repaired_wheels[0]
+
+        with zipfile.ZipFile(repaired) as archive:
+            bundled_runtimes = _bundled_cpp_runtimes(archive.namelist())
+        if bundled_runtimes:
+            sys.exit(f"repair_wheel: PAPI-owned C++ runtime libraries are forbidden: {bundled_runtimes}")
 
         # Step 3: Find Endstone's hashed SONAMEs.
         replacements = _find_endstone_hashed_sonames()
