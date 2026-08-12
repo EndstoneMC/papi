@@ -45,7 +45,7 @@ def _assert_isolated_sdist_flow(source: str) -> None:
     assert "Verify checkout and sdist wheel runtime contracts" in source
     assert "tools/verify_linux_wheel.py" in source
     assert "--compare" in source
-    assert "auditwheel show" in source
+    assert "/tmp/papi-sdist-build-env/bin/python -m auditwheel show" in source
     assert 'ldd "$module"' in source
     assert "native import unexpectedly succeeded without Endstone libc++" in source
     assert "assert not any('=> /usr/' in line for line in runtime)" in source

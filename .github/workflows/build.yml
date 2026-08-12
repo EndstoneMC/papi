@@ -375,7 +375,7 @@ jobs:
           sdist_wheel="$(find wheelhouse -maxdepth 1 -name '*.whl' -print -quit)"
           checkout_wheel="$(find /tmp/papi-checkout-wheel -maxdepth 1 -name '*.whl' -print -quit)"
           python tools/verify_linux_wheel.py "$sdist_wheel" --compare "$checkout_wheel"
-          auditwheel show "$sdist_wheel"
+          /tmp/papi-sdist-build-env/bin/python -m auditwheel show "$sdist_wheel"
 
       - name: Runtime smoke test from isolated sdist-built wheel
         shell: bash
