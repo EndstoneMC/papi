@@ -2,8 +2,17 @@
 # ABI-sensitive build dependencies are pinned for reproducibility. Keep the PEP 517
 # pybind11 package in lock-step with the Conan-resolved pybind11/3.0.1 CMake headers,
 # and update the CI Conan pin together with this declaration.
-requires = ["scikit-build-core-conan==0.9.2", "conan==2.30.0", "pybind11==3.0.1"]
-build-backend = "scikit_build_core_conan.build"
+requires = [
+    "scikit-build-core-conan==0.9.2",
+    "conan==2.30.0",
+    "pybind11==3.0.1",
+    "auditwheel==6.4.2; sys_platform == 'linux'",
+    "endstone==0.11.8; sys_platform == 'linux'",
+    "patchelf==0.17.2.4; sys_platform == 'linux'",
+    "wheel==0.45.1; sys_platform == 'linux'",
+]
+build-backend = "papi_build_backend"
+backend-path = ["."]
 
 [project]
 name = "endstone-papi"
@@ -95,12 +104,10 @@ environment = { CC = "/usr/bin/clang-20", CXX = "/usr/bin/clang++-20" }
 # DSOs that forward to them. The runtime dependency is also declared in
 # [project].dependencies, but we pin the exact build version for reproducibility.
 before-build = "pip install ninja wheel endstone==0.11.8"
-# Exclude libc++ and libc++abi from auditwheel bundling: _papi.so must use
-# Endstone's single libc++ copy, not a duplicate that would segfault when both
-# are loaded. tools/repair_wheel.py then creates no-implementation bridge DSOs
-# whose hashed dependencies resolve from endstone.libs/. No import-time mutation
-# of site-packages is needed.
-repair-wheel-command = "python tools/repair_wheel.py {wheel} {dest_dir}"
+# Every Linux build is repaired by papi_build_backend, including wheels rebuilt
+# from the sdist. The backend excludes libc++/libc++abi from bundling and creates
+# the standard-SONAME bridges through tools/repair_wheel.py.
+repair-wheel-command = ""
 before-all = [
     "dnf install -y clang20 cmake ninja-build python3-pip wget xz",
     "/usr/bin/clang-20 --version | tee /tmp/toolchain-provenance.txt",

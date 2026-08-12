@@ -52,12 +52,9 @@ def _find_endstone_hashed_sonames() -> dict[str, str]:
     return result
 
 
-def main() -> None:
-    if len(sys.argv) != 3:
-        sys.exit(f"usage: {sys.argv[0]} <wheel> <dest_dir>")
-    wheel = Path(sys.argv[1])
-    dest_dir = Path(sys.argv[2])
-
+def repair_wheel(wheel: Path, dest_dir: Path) -> Path:
+    """Repair one Linux wheel and return the final wheel path."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
     patchelf = shutil.which("patchelf")
     if patchelf is None:
         sys.exit("repair_wheel: patchelf not found on PATH")
@@ -70,33 +67,36 @@ def main() -> None:
         sys.exit(f"repair_wheel: Clang 20 is required, got {compiler_version}")
 
     # Step 1: Run auditwheel with --exclude to avoid bundling a duplicate libc++.
-    subprocess.check_call(
-        [
-            "auditwheel",
-            "repair",
-            "--exclude",
-            "libc++.so.1",
-            "--exclude",
-            "libc++abi.so.1",
-            "-w",
-            str(dest_dir),
-            str(wheel),
-        ]
-    )
+    with tempfile.TemporaryDirectory(prefix="papi-repair-") as repair_tmp:
+        repair_dir = Path(repair_tmp)
+        subprocess.check_call(
+            [
+                "auditwheel",
+                "repair",
+                "--exclude",
+                "libc++.so.1",
+                "--exclude",
+                "libc++abi.so.1",
+                "-w",
+                str(repair_dir),
+                str(wheel),
+            ]
+        )
 
-    # Step 2: Find the repaired wheel (auditwheel outputs exactly one).
-    repaired_wheels = list(dest_dir.glob("*.whl"))
-    if len(repaired_wheels) != 1:
-        sys.exit(f"repair_wheel: expected one repaired wheel in {dest_dir}, got {repaired_wheels}")
-    repaired = repaired_wheels[0]
+        # Step 2: Find the repaired wheel (auditwheel outputs exactly one).
+        repaired_wheels = list(repair_dir.glob("*.whl"))
+        if len(repaired_wheels) != 1:
+            sys.exit(f"repair_wheel: expected one repaired wheel in {repair_dir}, got {repaired_wheels}")
+        repaired = repaired_wheels[0]
 
-    # Step 3: Find Endstone's hashed SONAMEs.
-    replacements = _find_endstone_hashed_sonames()
+        # Step 3: Find Endstone's hashed SONAMEs.
+        replacements = _find_endstone_hashed_sonames()
 
-    # Step 4: Unpack, add standard-SONAME bridges, and repack. Rewriting
-    # _papi.so's NEEDED entries directly to Endstone's hashed names crashes
-    # during module initialization, while the standard SONAME path is proven.
-    with tempfile.TemporaryDirectory() as tmp:
+        # Step 4: Unpack, add standard-SONAME bridges, and repack. Rewriting
+        # _papi.so's NEEDED entries directly to Endstone's hashed names crashes
+        # during module initialization, while the standard SONAME path is proven.
+        tmp = repair_dir / "unpacked"
+        tmp.mkdir()
         subprocess.check_call([sys.executable, "-m", "wheel", "unpack", str(repaired), "-d", tmp])
         unpacked = list(Path(tmp).iterdir())
         if len(unpacked) != 1:
@@ -132,10 +132,25 @@ def main() -> None:
             subprocess.check_call([patchelf, "--force-rpath", "--set-rpath", "$ORIGIN/../endstone.libs", str(bridge)])
 
         # wheel pack records the bridge DSOs and regenerates RECORD.
-        repaired.unlink()
-        subprocess.check_call([sys.executable, "-m", "wheel", "pack", str(pkg_root), "-d", str(dest_dir)])
+        final_dir = repair_dir / "final"
+        final_dir.mkdir()
+        subprocess.check_call([sys.executable, "-m", "wheel", "pack", str(pkg_root), "-d", str(final_dir)])
+        final_wheels = list(final_dir.glob("*.whl"))
+        if len(final_wheels) != 1:
+            sys.exit(f"repair_wheel: expected one final wheel in {final_dir}, got {final_wheels}")
+        final = dest_dir / final_wheels[0].name
+        if final.exists():
+            sys.exit(f"repair_wheel: destination already exists: {final}")
+        shutil.move(str(final_wheels[0]), final)
 
     print(f"repair_wheel: added standard-SONAME bridges -> {replacements}")
+    return final
+
+
+def main() -> None:
+    if len(sys.argv) != 3:
+        sys.exit(f"usage: {sys.argv[0]} <wheel> <dest_dir>")
+    repair_wheel(Path(sys.argv[1]), Path(sys.argv[2]))
 
 
 if __name__ == "__main__":

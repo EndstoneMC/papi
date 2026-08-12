@@ -339,7 +339,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install build
-        run: python -m pip install build
+        run: python -m pip install build patchelf
 
       - name: Build sdist
         run: python -m build --sdist
@@ -370,24 +370,58 @@ jobs:
           sudo apt-get install -y libc++-20-dev libc++abi-20-dev
           /usr/bin/clang-20 --version | grep -E "clang version 20\\."
 
+      - name: Build checkout wheel through shared backend
+        shell: bash
+        run: |
+          CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
+            python -m build --wheel -o /tmp/papi-checkout-wheel
+
       - name: Build wheel from isolated sdist archive
         shell: bash
         run: |
           python -m venv /tmp/papi-sdist-build-env
           /tmp/papi-sdist-build-env/bin/python -m pip install \
-            "conan==2.30.0" cmake ninja "scikit-build-core-conan==0.9.2" "pybind11==3.0.1"
+            "conan==2.30.0" cmake ninja "scikit-build-core-conan==0.9.2" "pybind11==3.0.1" \
+            "auditwheel==6.4.2" "endstone==0.11.8" "patchelf==0.17.2.4" "wheel==0.45.1"
           cd /tmp/papi-sdist-build
           CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
             /tmp/papi-sdist-build-env/bin/pip wheel --no-deps --no-build-isolation \
             /tmp/papi-sdist-input/*.tar.gz -w /tmp/papi-sdist-wheel/
 
+      - name: Verify checkout and sdist wheel runtime contracts
+        shell: bash
+        run: |
+          sdist_wheel="$(find /tmp/papi-sdist-wheel -maxdepth 1 -name '*.whl' -print -quit)"
+          checkout_wheel="$(find /tmp/papi-checkout-wheel -maxdepth 1 -name '*.whl' -print -quit)"
+          python tools/verify_linux_wheel.py "$sdist_wheel" --compare "$checkout_wheel"
+          auditwheel show "$sdist_wheel"
+
       - name: Runtime smoke test from isolated sdist-built wheel
         shell: bash
         run: |
           python -m venv /tmp/papi-sdist-smoke-env
-          /tmp/papi-sdist-smoke-env/bin/pip install endstone==0.11.8 /tmp/papi-sdist-wheel/*.whl
+          /tmp/papi-sdist-smoke-env/bin/pip install /tmp/papi-sdist-wheel/*.whl
           cd /tmp/papi-sdist-smoke
           /tmp/papi-sdist-smoke-env/bin/python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py"
+          module="$(find /tmp/papi-sdist-smoke-env -path '*site-packages/endstone_papi/_papi*.so' -print -quit)"
+          ldd "$module" | tee /tmp/papi-sdist-ldd.txt
+          grep -F 'endstone_papi/libc++.so.1' /tmp/papi-sdist-ldd.txt
+          grep -F 'endstone_papi/libc++abi.so.1' /tmp/papi-sdist-ldd.txt
+          python -c "
+          from pathlib import Path
+          lines = Path('/tmp/papi-sdist-ldd.txt').read_text().splitlines()
+          runtime = [line for line in lines if 'libc++.so' in line or 'libc++abi.so' in line]
+          assert runtime, lines
+          assert not any('=> /usr/' in line for line in runtime), runtime
+          "
+          hashed="$(find /tmp/papi-sdist-smoke-env -path '*site-packages/endstone.libs/libc++-*.so.1.0' -print -quit)"
+          test -n "$hashed"
+          mv "$hashed" "$hashed.missing"
+          if /tmp/papi-sdist-smoke-env/bin/python -c 'import endstone_papi'; then
+            echo 'native import unexpectedly succeeded without Endstone libc++' >&2
+            exit 1
+          fi
+          mv "$hashed.missing" "$hashed"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
