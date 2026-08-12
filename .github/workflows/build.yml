@@ -261,7 +261,7 @@ jobs:
               assert 'endstone_papi/libc++.so.1' in names, 'libc++ runtime bridge missing'
               assert 'endstone_papi/libc++abi.so.1' in names, 'libc++abi runtime bridge missing'
               assert not any('endstone_papi.libs/' in n for n in names), 'duplicate C++ runtime bundled'
-          # Verify the Endstone runtime dependency is declared (PR2-004).
+          # Verify the Endstone runtime dependency is declared.
           meta = [n for n in names if n.endswith('METADATA')][0]
           content = z.read(meta).decode()
           assert any(

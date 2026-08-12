@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g. 1.0.0)"
+        description: "Version to release (e.g. 0.1.0)"
         required: true
         type: string
       dry_run:
@@ -179,7 +179,7 @@ jobs:
             fi
 
             mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$CANDIDATE_SHA")
-            if [[ "${changed[*]}" != "CHANGELOG.md CMakeLists.txt" ]]; then
+            if [[ "${changed[*]}" != "CHANGELOG.md" && "${changed[*]}" != "CHANGELOG.md CMakeLists.txt" ]]; then
               echo "::error::release candidate may change only CHANGELOG.md and CMakeLists.txt"
               exit 1
             fi
