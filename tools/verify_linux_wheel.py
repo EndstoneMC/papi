@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _BRIDGES = ("libc++.so.1", "libc++abi.so.1")
+_CPP_RUNTIME_PREFIXES = ("libc++", "libc++abi", "libunwind")
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,12 @@ class RuntimeContract:
 
 def _output(*command: str) -> str:
     return subprocess.check_output(command, text=True).strip()
+
+
+def _is_papi_owned_cpp_runtime(name: str) -> bool:
+    if not name.startswith("endstone_papi.libs/") or not name.endswith((".so", ".so.1", ".so.1.0")):
+        return False
+    return Path(name).name.startswith(_CPP_RUNTIME_PREFIXES)
 
 
 def inspect_wheel(wheel: Path) -> RuntimeContract:
@@ -56,7 +63,7 @@ def inspect_wheel(wheel: Path) -> RuntimeContract:
             relative = f"endstone_papi/{bridge_name}"
             if relative not in names or relative not in record:
                 raise AssertionError(f"{bridge_name} missing from wheel or RECORD in {wheel}")
-        if any(name.startswith("endstone_papi.libs/") for name in names):
+        if any(_is_papi_owned_cpp_runtime(name) for name in names):
             raise AssertionError(f"PAPI-owned runtime bundle found in {wheel}")
         if not requires_endstone:
             raise AssertionError(f"Endstone runtime dependency missing from {wheel}")

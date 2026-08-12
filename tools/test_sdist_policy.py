@@ -12,6 +12,13 @@ assert BACKEND_SPEC is not None and BACKEND_SPEC.loader is not None
 papi_build_backend = importlib.util.module_from_spec(BACKEND_SPEC)
 sys.modules[BACKEND_SPEC.name] = papi_build_backend
 BACKEND_SPEC.loader.exec_module(papi_build_backend)
+VERIFIER_SPEC = importlib.util.spec_from_file_location(
+    "papi_verify_linux_wheel", ROOT / "tools" / "verify_linux_wheel.py"
+)
+assert VERIFIER_SPEC is not None and VERIFIER_SPEC.loader is not None
+verify_linux_wheel = importlib.util.module_from_spec(VERIFIER_SPEC)
+sys.modules[VERIFIER_SPEC.name] = verify_linux_wheel
+VERIFIER_SPEC.loader.exec_module(verify_linux_wheel)
 
 BUILD_WORKFLOW = ROOT / ".github" / "workflows" / "build.yml"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
@@ -101,6 +108,14 @@ def test_windows_backend_delegates_without_linux_repair() -> None:
         assert result == "raw.whl"
         assert (destination / result).read_bytes() == b"raw"
         repair.assert_not_called()
+
+
+def test_runtime_bundle_check_ignores_empty_directory_but_rejects_cpp_runtime_files() -> None:
+    assert not verify_linux_wheel._is_papi_owned_cpp_runtime("endstone_papi.libs/")
+    assert not verify_linux_wheel._is_papi_owned_cpp_runtime("endstone_papi.libs/libother-123.so.2")
+    assert verify_linux_wheel._is_papi_owned_cpp_runtime("endstone_papi.libs/libc++-123.so.1.0")
+    assert verify_linux_wheel._is_papi_owned_cpp_runtime("endstone_papi.libs/libc++abi-123.so.1.0")
+    assert verify_linux_wheel._is_papi_owned_cpp_runtime("endstone_papi.libs/libunwind-123.so.1")
 
 
 def test_ci_builds_and_smokes_only_the_copied_archive() -> None:
