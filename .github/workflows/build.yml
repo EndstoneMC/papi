@@ -356,8 +356,9 @@ jobs:
         run: |
           CIBW_BUILD=cp312-manylinux_x86_64 python -m cibuildwheel --platform linux \
             --output-dir /tmp/papi-checkout-wheel .
+          cd /tmp/papi-sdist-build
           CIBW_BUILD=cp312-manylinux_x86_64 python -m cibuildwheel --platform linux \
-            --output-dir "$GITHUB_WORKSPACE/wheelhouse" /tmp/papi-sdist-build
+            --output-dir "$GITHUB_WORKSPACE/wheelhouse" .
 
       - name: Reclaim Conan home
         if: always()

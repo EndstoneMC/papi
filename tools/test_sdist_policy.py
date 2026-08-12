@@ -41,6 +41,7 @@ def _assert_isolated_sdist_flow(source: str) -> None:
     assert 'python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py"' in source
     assert "Build checkout and isolated sdist wheels at Endstone baseline" in source
     assert source.count("python -m cibuildwheel --platform linux") >= 2
+    assert "cd /tmp/papi-sdist-build" in source
     assert "CIBW_CONTAINER_ENGINE" in source
     assert "ghcr.io/endstonemc/manylinux_2_31_x86_64" in source
     assert "Verify checkout and sdist wheel runtime contracts" in source

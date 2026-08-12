@@ -13,9 +13,6 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from elftools.elf.elffile import ELFFile
-from elftools.elf.gnuversions import GNUVerNeedSection
-
 _BRIDGES = ("libc++.so.1", "libc++abi.so.1")
 _CPP_RUNTIME_PREFIXES = ("libc++", "libc++abi", "libunwind")
 _EXPECTED_PLATFORM = "manylinux_2_31_x86_64"
@@ -68,6 +65,9 @@ def _wheel_metadata_platforms(content: str) -> set[str]:
 
 
 def _glibc_requirement(path: Path) -> tuple[int, int] | None:
+    from elftools.elf.elffile import ELFFile
+    from elftools.elf.gnuversions import GNUVerNeedSection
+
     maximum = (0, 0)
     with path.open("rb") as stream:
         if stream.read(4) != b"\x7fELF":
