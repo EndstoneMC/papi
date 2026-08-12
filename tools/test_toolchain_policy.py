@@ -1,14 +1,19 @@
-"""Static regressions for ABI-sensitive compiler and backend provenance."""
+"""Regressions for ABI-sensitive compiler and backend provenance."""
 
+import importlib.util
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
 import tomllib
 
-import tools.repair_wheel
-
 ROOT = Path(__file__).resolve().parent.parent
+REPAIR_SPEC = importlib.util.spec_from_file_location("papi_repair_wheel", ROOT / "tools" / "repair_wheel.py")
+assert REPAIR_SPEC is not None and REPAIR_SPEC.loader is not None
+repair_wheel = importlib.util.module_from_spec(REPAIR_SPEC)
+sys.modules[REPAIR_SPEC.name] = repair_wheel
+REPAIR_SPEC.loader.exec_module(repair_wheel)
 
 
 def test_cmake_requires_and_records_clang_20() -> None:
@@ -73,22 +78,22 @@ def test_repair_accepts_vendor_prefixed_clang_20_and_rejects_other_majors() -> N
     ]
 
     for version, rejected in versions:
-        with TemporaryDirectory() as temporary_directory:
-            with (
-                mock.patch.object(tools.repair_wheel.shutil, "which", return_value="/usr/bin/clang-20"),
-                mock.patch.object(tools.repair_wheel.subprocess, "check_output", return_value=f"{version}\n"),
-                mock.patch.object(tools.repair_wheel.subprocess, "check_call", side_effect=RuntimeError("accepted")),
-            ):
-                try:
-                    tools.repair_wheel.repair_wheel(Path("input.whl"), Path(temporary_directory) / "output")
-                except SystemExit as error:
-                    if not rejected:
-                        raise AssertionError(f"unexpected rejection for {version!r}: {error}") from error
-                except RuntimeError as error:
-                    if rejected or str(error) != "accepted":
-                        raise
-                else:
-                    raise AssertionError("repair test did not reach a terminal result")
+        with (
+            TemporaryDirectory() as temporary_directory,
+            mock.patch.object(repair_wheel.shutil, "which", return_value="/usr/bin/clang-20"),
+            mock.patch.object(repair_wheel.subprocess, "check_output", return_value=f"{version}\n"),
+            mock.patch.object(repair_wheel.subprocess, "check_call", side_effect=RuntimeError("accepted")),
+        ):
+            try:
+                repair_wheel.repair_wheel(Path("input.whl"), Path(temporary_directory) / "output")
+            except SystemExit as error:
+                if not rejected:
+                    raise AssertionError(f"unexpected rejection for {version!r}: {error}") from error
+            except RuntimeError as error:
+                if rejected or str(error) != "accepted":
+                    raise
+            else:
+                raise AssertionError("repair test did not reach a terminal result")
 
 
 def main() -> int:
