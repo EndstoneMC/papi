@@ -34,6 +34,7 @@ def _assert_isolated_sdist_flow(source: str) -> None:
     assert "cd /tmp/papi-sdist-smoke" in source
     assert 'python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py"' in source
     assert "Build checkout wheel through shared backend" in source
+    assert "tar --wildcards -xOf /tmp/papi-sdist-input/*.tar.gz" in source
     assert "Verify checkout and sdist wheel runtime contracts" in source
     assert "tools/verify_linux_wheel.py" in source
     assert "--compare" in source
