@@ -284,8 +284,7 @@ PYBIND11_MODULE(_papi, m)
 
     // Private bootstrap surface. Only the PAPI plugin uses it; it is deliberately not
     // part of the documented API and grants no way to implement the service.
-    py::class_<papi::detail::PapiBootstrap>(m, "_PapiBootstrap",
-                                            "Internal native lifecycle state for the PAPI plugin.")
+    py::class_<papi::detail::PapiBootstrap>(m, "_PapiBootstrap", "Internal native lifecycle state for the PAPI plugin.")
         .def(py::init<>())
         .def("start", &papi::detail::PapiBootstrap::start, py::arg("plugin"),
              "Internal: builds the service and registers it with Endstone.")

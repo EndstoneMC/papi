@@ -1,5 +1,12 @@
 // Verifies each public header is self-contained: including it alone must compile.
 
+#include <memory>
+#include <type_traits>
+
+#include <endstone/plugin/service.h>
+
+#include <gtest/gtest.h>
+
 #include "endstone_papi/events.h"
 #include "endstone_papi/expansion_info.h"
 #include "endstone_papi/papi.h"
@@ -7,13 +14,6 @@
 #include "endstone_papi/placeholder_expansion.h"
 #include "endstone_papi/unregister_reason.h"
 #include "endstone_papi/version.h"
-
-#include <memory>
-#include <type_traits>
-
-#include <endstone/plugin/service.h>
-
-#include <gtest/gtest.h>
 
 // GoogleTest ASSERT_TRUE(x.has_value()) aborts on failure, but clang-tidy
 // cannot track this through the macro, producing false positives below.
