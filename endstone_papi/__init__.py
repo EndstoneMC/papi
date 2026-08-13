@@ -19,6 +19,12 @@ placeholders through expansions supplied by C++ or Python plugins.
 # which triggers endstone._python loading at the right time (after _papi's own
 # translator is registered).
 try:
+    from ._native_loader import load_native as _load_native
+    from ._native_loader import should_use_shadow as _should_use_shadow
+
+    if _should_use_shadow(__file__):
+        _load_native(__name__, __file__)
+
     from ._papi import (
         SERVICE_NAME,
         ExpansionInfo,
