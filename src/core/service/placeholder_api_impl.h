@@ -9,7 +9,6 @@
 
 #include "endstone_papi/placeholder_api.h"
 
-#include "core/deprecation.h"
 #include "core/diagnostics/error_throttle.h"
 #include "core/platform.h"
 #include "core/registry/expansion_manager.h"
@@ -71,15 +70,6 @@ public:
     bool registerExpansion(endstone::Plugin &owner, std::shared_ptr<PlaceholderExpansion> expansion) override;
     bool unregisterExpansion(endstone::Plugin &owner, std::string_view identifier) override;
     std::size_t unregisterExpansions(endstone::Plugin &owner) override;
-
-    // Deprecated compatibility surface, kept for one release. Implemented by wrapping
-    // the callback in an ordinary owner-tracked expansion so it shares the same
-    // lifecycle as everything else in the registry.
-    PAPI_SUPPRESS_DEPRECATED_BEGIN
-    [[nodiscard]] bool registerPlaceholder(const endstone::Plugin &plugin, std::string_view identifier,
-                                           Processor processor) const override;
-    [[nodiscard]] std::string getPlaceholderPattern() const override;
-    PAPI_SUPPRESS_DEPRECATED_END
 
     /**
      * @brief Transitions the service out of Active so nothing new can start.

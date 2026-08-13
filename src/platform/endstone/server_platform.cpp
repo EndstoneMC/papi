@@ -31,14 +31,6 @@ bool ServerPlatform::isPluginEnabled(const endstone::Plugin &plugin) const
     return server_->getPluginManager().isPluginEnabled(const_cast<endstone::Plugin *>(&plugin));
 }
 
-const endstone::Player *ServerPlatform::getOnlinePlayer(const endstone::UUID id) const
-{
-    if (!server_) {
-        return nullptr;
-    }
-    return server_->getPlayer(id);
-}
-
 void ServerPlatform::log(const endstone::Logger::Level level, const std::string_view message)
 {
     if (!logger_) {

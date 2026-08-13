@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -15,7 +14,6 @@
 #include <endstone/player.h>
 #include <endstone/plugin/plugin.h>
 #include <endstone/plugin/plugin_description.h>
-#include <endstone/util/uuid.h>
 
 #include "endstone_papi/events.h"
 #include "endstone_papi/placeholder_expansion.h"
@@ -115,12 +113,6 @@ public:
         return enabled_plugins.contains(&plugin);
     }
 
-    [[nodiscard]] const endstone::Player *getOnlinePlayer(const endstone::UUID id) const override
-    {
-        const auto it = online_players.find(id);
-        return it == online_players.end() ? nullptr : it->second;
-    }
-
     void log(const endstone::Logger::Level level, const std::string_view message) override
     {
         logger.log(level, message);
@@ -164,14 +156,9 @@ public:
         enabled_names.erase(plugin.getName());
     }
 
-    void registerOnlinePlayer(const endstone::UUID id, const endstone::Player &player) { online_players[id] = &player; }
-
-    void unregisterOnlinePlayer(const endstone::UUID id) { online_players.erase(id); }
-
     bool primary_thread = true;
     std::unordered_set<const endstone::Plugin *> enabled_plugins;
     std::unordered_set<std::string> enabled_names;
-    std::unordered_map<endstone::UUID, const endstone::Player *> online_players;
     std::vector<RecordedEvent> events;
     RecordingLogger logger;
 };

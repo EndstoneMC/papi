@@ -15,13 +15,6 @@ namespace papi::detail {
 namespace {
 
 /**
- * @brief The historical pattern PAPI 0.0.1 documented.
- *
- * Kept verbatim for source compatibility. It is not used for parsing or validation.
- */
-constexpr std::string_view LegacyPlaceholderPattern = "[{]([^{}]+)[}]";
-
-/**
  * @brief Maximum nesting depth for reentrant parsing.
  *
  * A provider callback can call setPlaceholders again, forming a chain. C++ has no
@@ -148,55 +141,6 @@ template <typename Fn>
         return false;
     }
 }
-
-/**
- * @brief Adapts a historical processor callback to the expansion contract.
- *
- * Registered like any other expansion so it is cleaned up and destroyed on the same
- * owner-driven schedule; the std::function cannot outlive its plugin's module.
- *
- * Two limitations are inherent to the old signature and are documented on the public
- * API: every return value is used verbatim, so the callback cannot express "leave
- * this placeholder alone", and it only ever receives an online Player.
- */
-class LegacyProcessorExpansion final : public PlaceholderExpansion {
-public:
-    LegacyProcessorExpansion(std::string identifier, std::string owner, PlaceholderAPI::Processor processor,
-                             Platform &platform)
-        : identifier_(std::move(identifier)), owner_(std::move(owner)), processor_(std::move(processor)),
-          platform_(platform)
-    {
-    }
-
-    [[nodiscard]] std::string getIdentifier() const override { return identifier_; }
-    [[nodiscard]] std::string getAuthor() const override { return owner_; }
-    [[nodiscard]] std::string getVersion() const override { return "legacy"; }
-
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
-                                                       const std::string_view params) override
-    {
-        if (!processor_) {
-            return std::nullopt;
-        }
-        // The old callback takes a Player, so an offline-only player is resolved
-        // through the server by identity and becomes null when not online.
-        const endstone::Player *online = player ? platform_.getOnlinePlayer(player->getUniqueId()) : nullptr;
-        return processor_(online, std::string(params));
-    }
-
-    void onUnregister(UnregisterReason) override
-    {
-        // Drop the callback here rather than at destruction so it cannot survive
-        // into a window where its plugin's code may already be gone.
-        processor_ = nullptr;
-    }
-
-private:
-    std::string identifier_;
-    std::string owner_;
-    PlaceholderAPI::Processor processor_;
-    Platform &platform_;
-};
 
 }  // namespace
 
@@ -479,33 +423,6 @@ std::size_t PlaceholderApiImpl::unregisterExpansions(endstone::Plugin &owner)
     }
     return removed.size();
 }
-
-PAPI_SUPPRESS_DEPRECATED_BEGIN
-
-bool PlaceholderApiImpl::registerPlaceholder(const endstone::Plugin &plugin, const std::string_view identifier,
-                                             Processor processor) const
-{
-    if (!processor) {
-        return false;
-    }
-
-    // The historical signature is const and takes a const plugin, but registration
-    // needs a mutable owner. The cast is safe because Endstone hands out the same
-    // plugin object either way, and the registry only uses it as identity.
-    auto &self = const_cast<PlaceholderApiImpl &>(*this);
-    auto &owner = const_cast<endstone::Plugin &>(plugin);
-
-    auto expansion = std::make_shared<LegacyProcessorExpansion>(std::string(identifier), plugin.getName(),
-                                                                std::move(processor), platform());
-    return self.registerExpansion(owner, std::move(expansion));
-}
-
-std::string PlaceholderApiImpl::getPlaceholderPattern() const
-{
-    return std::string(LegacyPlaceholderPattern);
-}
-
-PAPI_SUPPRESS_DEPRECATED_END
 
 void PlaceholderApiImpl::handlePluginDisabled(endstone::Plugin &plugin)
 {

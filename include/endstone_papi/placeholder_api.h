@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -170,54 +169,6 @@ public:
      * @return how many expansions were removed
      */
     virtual std::size_t unregisterExpansions(endstone::Plugin &owner) = 0;
-
-    /**
-     * @brief The historical single-callback placeholder signature.
-     *
-     * @deprecated Implement PlaceholderExpansion instead. A processor cannot report
-     *             "unresolved", cannot supply metadata, and only ever receives an
-     *             online Player.
-     */
-    using Processor = std::function<std::string(const endstone::Player *, std::string)>;
-
-    /**
-     * @brief Registers a bare callback as a placeholder.
-     *
-     * Provided only so plugins written against PAPI 0.0.1 keep compiling. The
-     * callback is wrapped in an internal expansion that participates in normal
-     * owner-aware lifecycle, so it is still released before its plugin unloads.
-     *
-     * Differences from registerExpansion: the callback cannot express "leave this
-     * placeholder alone" because every return value is used verbatim, including
-     * the empty string; and it is passed null whenever the resolved player is not
-     * an online Player. Duplicate identifiers fail instead of being renamed into a
-     * <code>plugin:identifier</code> namespace.
-     *
-     * @deprecated Implement PlaceholderExpansion and use registerExpansion.
-     *
-     * @param plugin the plugin registering the placeholder
-     * @param identifier the identifier to register
-     * @param processor the callback that produces the value
-     * @return true if the placeholder was registered
-     */
-    [[deprecated(
-        "Implement papi::PlaceholderExpansion and call registerExpansion instead.")]] [[nodiscard]] virtual bool
-    registerPlaceholder(const endstone::Plugin &plugin, std::string_view identifier, Processor processor) const = 0;
-
-    /**
-     * @brief The regular expression PAPI 0.0.1 documented for placeholders.
-     *
-     * Returned unchanged for source compatibility. It describes neither the current
-     * syntax nor the current implementation: parsing is a single non-regex scan and
-     * identifier validation is stricter than this pattern.
-     *
-     * @deprecated Use containsPlaceholders, or match the documented
-     *             <code>{identifier_params}</code> syntax directly.
-     *
-     * @return the historical pattern <code>[{]([^{}]+)[}]</code>
-     */
-    [[deprecated("The parser is not regex based; use containsPlaceholders instead.")]] [[nodiscard]] virtual std::string
-    getPlaceholderPattern() const = 0;
 };
 
 }  // namespace papi

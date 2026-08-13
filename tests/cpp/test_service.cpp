@@ -651,61 +651,6 @@ TEST_F(ServiceTest, ProviderIsDestroyedBeforeItsModuleCouldUnload)
     EXPECT_EQ(destroyed, 1);
 }
 
-// COM-001, COM-002, COM-003: the deprecated surface still works, through the same
-// owner-aware lifecycle.
-PAPI_SUPPRESS_DEPRECATED_BEGIN
-
-TEST_F(ServiceTest, LegacyProcessorRegistrationUsesTheNormalLifecycle)
-{
-    int calls = 0;
-    const bool registered = service_->registerPlaceholder(
-        owner_, "legacy", [&calls](const endstone::Player *player, const std::string &params) {
-            ++calls;
-            EXPECT_EQ(player, nullptr);
-            return "value:" + params;
-        });
-    ASSERT_TRUE(registered);
-
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{legacy_x}"), "value:x");
-    EXPECT_EQ(calls, 1);
-
-    // It appears in introspection like any other expansion and obeys owner cleanup.
-    ASSERT_EQ(service_->getExpansions().size(), 1U);
-    EXPECT_EQ(service_->getExpansions()[0].identifier, "legacy");
-    EXPECT_EQ(service_->getExpansions()[0].owner, "provider");
-
-    platform_->disable(owner_);
-    service_->handlePluginDisabled(owner_);
-    EXPECT_FALSE(service_->isRegistered("legacy"));
-}
-
-TEST_F(ServiceTest, LegacyProcessorDuplicateFailsWithoutAColonNamespace)
-{
-    ASSERT_TRUE(service_->registerPlaceholder(owner_, "demo",
-                                              [](const endstone::Player *, const std::string &) { return "first"; }));
-    EXPECT_FALSE(service_->registerPlaceholder(other_owner_, "demo",
-                                               [](const endstone::Player *, const std::string &) { return "second"; }));
-
-    EXPECT_EQ(service_->getExpansions().size(), 1U);
-    EXPECT_FALSE(service_->isRegistered("other:demo"));
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo_x}"), "first");
-}
-
-TEST_F(ServiceTest, LegacyProcessorRejectsNullAndInvalidIdentifiers)
-{
-    EXPECT_FALSE(service_->registerPlaceholder(owner_, "demo", nullptr));
-    EXPECT_FALSE(service_->registerPlaceholder(owner_, "bad_id",
-                                               [](const endstone::Player *, const std::string &) { return "x"; }));
-    EXPECT_TRUE(service_->getExpansions().empty());
-}
-
-TEST_F(ServiceTest, LegacyPatternAccessorReturnsTheHistoricalString)
-{
-    EXPECT_EQ(service_->getPlaceholderPattern(), "[{]([^{}]+)[}]");
-}
-
-PAPI_SUPPRESS_DEPRECATED_END
-
 // COM-004: the historical pipe syntax is gone rather than dual-parsed.
 TEST_F(ServiceTest, PipeSyntaxIsNoLongerRecognized)
 {

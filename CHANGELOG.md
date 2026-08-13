@@ -29,9 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   post-commit events
 - Bounded 60-second error throttling with injectable monotonic clock
 - Strict ASCII identifier grammar `[A-Za-z0-9][A-Za-z0-9.-]*`
-- Deprecated C++ `Processor` adapter and `getPlaceholderPattern`, and Python
-  `register_placeholder` and `placeholder_pattern`, for one-release source
-  compatibility
 - Windows and Linux CI with clang-cl/Clang 20, Conan 2, CMake 3.29, and
   CPython 3.10–3.14 wheel matrix
 - Architecture boundary enforcement via automated tests
@@ -44,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: Python registry, pipe parser, and all built-in placeholders
 - **BREAKING**: `{identifier|params}` pipe syntax
 - **BREAKING**: `plugin:identifier` duplicate-namespace fallback
+- **BREAKING**: 0.0.1 compatibility adapters `PlaceholderAPI::Processor`,
+  `registerPlaceholder`, `getPlaceholderPattern`, Python `register_placeholder`,
+  and `placeholder_pattern`
 
 ### Fixed
 
@@ -61,6 +61,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `endstone>=0.11.8,<0.12` is now declared as a runtime dependency, so
   `pip install endstone-papi` resolves the required Endstone C++ runtime
   automatically
-- Deprecated `register_placeholder` Python adapter no longer risks a
-  use-after-free during GIL-unsafe callback destruction and no longer invokes
-  Python attribute descriptors before the native service gate

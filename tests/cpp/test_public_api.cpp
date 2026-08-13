@@ -1,10 +1,4 @@
 // Verifies each public header is self-contained: including it alone must compile.
-// Deprecated members are declared in these headers, so warnings are silenced here
-// rather than at the declaration sites.
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
 
 #include "endstone_papi/events.h"
 #include "endstone_papi/expansion_info.h"
@@ -13,10 +7,6 @@
 #include "endstone_papi/placeholder_expansion.h"
 #include "endstone_papi/unregister_reason.h"
 #include "endstone_papi/version.h"
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
 
 #include <memory>
 #include <type_traits>
@@ -39,6 +29,19 @@ static_assert(std::is_copy_assignable_v<papi::ExpansionInfo>);
 static_assert(std::is_base_of_v<endstone::Service, papi::PlaceholderAPI>);
 static_assert(std::has_virtual_destructor_v<papi::PlaceholderAPI>);
 static_assert(std::has_virtual_destructor_v<papi::PlaceholderExpansion>);
+
+template <typename T>
+concept HasRemovedProcessorAlias = requires { typename T::Processor; };
+
+template <typename T>
+concept HasRemovedRegisterPlaceholder = requires { &T::registerPlaceholder; };
+
+template <typename T>
+concept HasRemovedPatternAccessor = requires { &T::getPlaceholderPattern; };
+
+static_assert(!HasRemovedProcessorAlias<papi::PlaceholderAPI>);
+static_assert(!HasRemovedRegisterPlaceholder<papi::PlaceholderAPI>);
+static_assert(!HasRemovedPatternAccessor<papi::PlaceholderAPI>);
 
 // Providers hand ownership to PAPI through a shared pointer.
 static_assert(std::is_same_v<decltype(std::declval<papi::PlaceholderAPI &>().registerExpansion(

@@ -113,7 +113,6 @@ python -m build --sdist
 - C++20, extensions off.
 - Use `[[nodiscard]]` on query methods that return values the caller should not
   discard.
-- Use `[[deprecated]]` on compatibility surfaces that must not be used in new code.
 - Keep hot paths bounded and allocation-free where the surrounding design requires it.
 - Keep comments terse and explain only non-obvious constraints.
 - Do not leave development-process notes or comments that merely restate code.
@@ -150,7 +149,6 @@ src/
     service/             # Concrete PlaceholderAPI implementation
     diagnostics/         # Error throttling
     platform.h           # Abstract platform interface
-    deprecation.h        # Deprecation suppression macros
   platform/
     endstone/            # Endstone-specific adapters
       bootstrap.cpp      # Service lifecycle: create, register, shut down

@@ -153,14 +153,13 @@ This release is a rewrite; 0.0.1 plugins need changes.
 | duplicate id became `plugin:identifier` | duplicate registration fails |
 | `setPlaceholders(Player*, text)` | `setPlaceholders(OfflinePlayer*, text)`, which accepts null |
 
-The C++ `registerPlaceholder` overload and `getPlaceholderPattern` remain for one
-release, marked deprecated. The processor form cannot express "unresolved" — every
-return value is used verbatim — and only ever receives an online player, so prefer an
-expansion. The Python `register_placeholder` and `placeholder_pattern` adapters are
-likewise retained for one release: `register_placeholder` wraps a callable in an
-internal expansion (so it shares the owner-aware registry and can return `None` to
-leave a placeholder unresolved), and `placeholder_pattern` returns the historical
-bracket regex string without affecting the parser.
+The transitional 0.0.1 compatibility adapters are not part of 0.1.0. In C++,
+`PlaceholderAPI::Processor`, `registerPlaceholder`, and `getPlaceholderPattern` were
+removed; implement `PlaceholderExpansion` and call `registerExpansion`. In Python,
+`register_placeholder` and `placeholder_pattern` were removed; subclass
+`PlaceholderExpansion` and call `register_expansion`. Use `containsPlaceholders` /
+`contains_placeholders` when a lexical placeholder check is needed; the parser does not
+expose or use a regex pattern.
 
 Identifiers are now validated: they must match `[A-Za-z0-9][A-Za-z0-9.-]*`. Underscore
 is the parameter separator and colon belonged to the removed duplicate-namespace

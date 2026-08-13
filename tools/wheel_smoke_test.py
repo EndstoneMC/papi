@@ -71,6 +71,24 @@ def main() -> int:
     except TypeError:
         pass
 
+    for member in (
+        "load",
+        "active",
+        "set_placeholders",
+        "set_relational_placeholders",
+        "contains_placeholders",
+        "is_registered",
+        "registered_identifiers",
+        "expansions",
+        "register_expansion",
+        "unregister_expansion",
+        "unregister_expansions",
+    ):
+        assert hasattr(PlaceholderAPI, member), f"PlaceholderAPI missing member: {member}"
+
+    for removed in ("register_placeholder", "placeholder_pattern"):
+        assert not hasattr(PlaceholderAPI, removed), f"legacy PlaceholderAPI member still exposed: {removed}"
+
     print(f"OK: endstone_papi {version} runtime smoke test passed")
     return 0
 

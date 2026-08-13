@@ -46,8 +46,6 @@ endforeach ()
 
 add_library(papi_header_self_contained OBJECT ${PAPI_HEADER_TU_SOURCES})
 target_link_libraries(papi_header_self_contained PRIVATE endstone_papi::endstone_papi)
-target_compile_options(papi_header_self_contained PRIVATE
-        $<$<CXX_COMPILER_ID:Clang>:-Wno-deprecated-declarations>)
 
 add_executable(papi_consumer_compile cpp/consumer_compile.cpp)
 target_link_libraries(papi_consumer_compile PRIVATE endstone_papi::endstone_papi)

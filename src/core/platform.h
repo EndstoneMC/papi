@@ -1,13 +1,10 @@
 #pragma once
 
-#include <string>
 #include <string_view>
 
 #include <endstone/event/event.h>
 #include <endstone/logger.h>
-#include <endstone/player.h>
 #include <endstone/plugin/plugin.h>
-#include <endstone/util/uuid.h>
 
 namespace papi::detail {
 
@@ -41,17 +38,6 @@ public:
      * @brief Whether this exact plugin object is currently loaded and enabled.
      */
     [[nodiscard]] virtual bool isPluginEnabled(const endstone::Plugin &plugin) const = 0;
-
-    /**
-     * @brief Resolves a player identity to the online Player, if they are online.
-     *
-     * Used only by the deprecated processor adapter, whose historical callback takes
-     * a Player. Going through the server by UUID avoids a cast across the plugin
-     * boundary, which is not reliable between separately compiled modules.
-     *
-     * @return the online player, or null if that player is not currently online
-     */
-    [[nodiscard]] virtual const endstone::Player *getOnlinePlayer(endstone::UUID id) const = 0;
 
     /**
      * @brief Logs a message on PAPI's behalf.

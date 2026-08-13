@@ -19,7 +19,6 @@ public:
     [[nodiscard]] bool isPrimaryThread() const override;
     [[nodiscard]] bool isPluginEnabled(std::string_view name) const override;
     [[nodiscard]] bool isPluginEnabled(const endstone::Plugin &plugin) const override;
-    [[nodiscard]] const endstone::Player *getOnlinePlayer(endstone::UUID id) const override;
     void log(endstone::Logger::Level level, std::string_view message) override;
     void callEvent(endstone::Event &event) override;
 
