@@ -207,7 +207,7 @@ headers. The dependency direction is enforced by `tests/test_architecture_bounda
 - `PlaceholderExpansion` — subclassable. Uses pybind11 3 `py::smart_holder` and
   `py::trampoline_self_life_support`.
 - `ExpansionInfo`, `UnregisterReason`, events — value/enum types.
-- `_PapiHost` — internal bootstrap, only used by the PAPI plugin itself.
+- `_PapiBootstrap` — internal native lifecycle state owned by the PAPI plugin.
 
 ## C++/Python Interop
 

@@ -27,8 +27,8 @@ class RecordingSender:
         self.errors.append(str(message))
 
 
-class StubHost:
-    """Stands in for the native host so command parsing can be tested in isolation."""
+class StubBootstrap:
+    """Stands in for native lifecycle state so commands can be tested in isolation."""
 
     def __init__(self, service: object | None) -> None:
         self._service = service
@@ -51,13 +51,13 @@ class StubService:
 
 
 def make_plugin(service: object | None) -> PlaceholderAPIPlugin:
-    """Builds a plugin whose native host is replaced by a stub.
+    """Builds a plugin whose native lifecycle state is replaced by a stub.
 
     The plugin is not constructed through Endstone, so ``__init__`` is bypassed; only the
     command handler is under test.
     """
     plugin = PlaceholderAPIPlugin.__new__(PlaceholderAPIPlugin)
-    plugin._host = StubHost(service)
+    plugin._bootstrap = StubBootstrap(service)
     return plugin
 
 
@@ -71,6 +71,7 @@ def test_command_and_permission_metadata_is_declared() -> None:
     # Every subcommand the handler implements is documented in the usages.
     usages = " ".join(papi["usages"])
     assert "parse" in usages
+    assert sum(" parse " in f" {usage} " for usage in papi["usages"]) == 1
     assert "list" in usages
     assert "info" in usages
 

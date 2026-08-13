@@ -197,8 +197,8 @@ class ExpansionUnregisteredEvent(Event):
     def reason(self) -> UnregisterReason:
         """Why the expansion was removed."""
 
-class _PapiHost:
-    """Internal: owns the native service for the PAPI plugin."""
+class _PapiBootstrap:
+    """Internal native lifecycle state owned by the PAPI plugin."""
 
     def start(self, plugin: Plugin) -> bool: ...
     def stop(self) -> None: ...

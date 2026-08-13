@@ -30,26 +30,6 @@ namespace py = pybind11;
 namespace {
 
 /**
- * @brief Owns the native service on behalf of the Python PAPI plugin.
- *
- * The Python plugin holds one of these and does nothing else. All framework state lives
- * natively, so a torn-down Python object cannot leave the registry in a bad state:
- * shutdown is driven explicitly from on_disable while the interpreter and every
- * provider module are still loaded.
- */
-class PapiHost {
-public:
-    bool start(endstone::Plugin &plugin) { return bootstrap_.start(plugin); }
-
-    void stop() { bootstrap_.stop(); }
-
-    [[nodiscard]] std::shared_ptr<papi::PlaceholderAPI> getService() const { return bootstrap_.getService(); }
-
-private:
-    papi::detail::PapiBootstrap bootstrap_;
-};
-
-/**
  * @brief Registers an expansion supplied from Python.
  *
  * The provider is wrapped in a GIL-safe proxy before it reaches the registry, so every
@@ -304,12 +284,14 @@ PYBIND11_MODULE(_papi, m)
 
     // Private bootstrap surface. Only the PAPI plugin uses it; it is deliberately not
     // part of the documented API and grants no way to implement the service.
-    py::class_<PapiHost>(m, "_PapiHost", "Internal: owns the native PlaceholderAPI service.")
+    py::class_<papi::detail::PapiBootstrap>(m, "_PapiBootstrap",
+                                            "Internal native lifecycle state for the PAPI plugin.")
         .def(py::init<>())
-        .def("start", &PapiHost::start, py::arg("plugin"),
+        .def("start", &papi::detail::PapiBootstrap::start, py::arg("plugin"),
              "Internal: builds the service and registers it with Endstone.")
-        .def("stop", &PapiHost::stop, "Internal: tears the service down. Idempotent.")
-        .def_property_readonly("service", &PapiHost::getService, "Internal: the published service, or None.");
+        .def("stop", &papi::detail::PapiBootstrap::stop, "Internal: tears the service down. Idempotent.")
+        .def_property_readonly("service", &papi::detail::PapiBootstrap::getService,
+                               "Internal: the published service, or None.");
 
 #ifdef PAPI_TEST_BINDINGS
     // Test-only: lets Python regression tests construct the proxy directly so its

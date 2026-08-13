@@ -11,7 +11,7 @@ from endstone import Player
 from endstone.command import Command, CommandSender
 from endstone.plugin import Plugin
 
-from ._papi import _PapiHost
+from ._papi import _PapiBootstrap
 
 
 class PlaceholderAPIPlugin(Plugin):
@@ -21,8 +21,7 @@ class PlaceholderAPIPlugin(Plugin):
         "papi": {
             "description": "PlaceholderAPI command",
             "usages": [
-                "/papi parse <text: message>",
-                "/papi parse <target: player> <text: message>",
+                "/papi parse <arguments: message>",
                 "/papi list",
                 "/papi info <identifier: string>",
             ],
@@ -39,17 +38,17 @@ class PlaceholderAPIPlugin(Plugin):
 
     def __init__(self) -> None:
         super().__init__()
-        self._host = _PapiHost()
+        self._bootstrap = _PapiBootstrap()
 
     def on_enable(self) -> None:
-        self._host.start(self)
+        self._bootstrap.start(self)
         self.logger.info("PlaceholderAPI is ready.")
 
     def on_disable(self) -> None:
         # Native teardown must run here, while every provider module and the
         # interpreter are still loaded. Leaving it to garbage collection would let
         # expansions outlive the code that defines them.
-        self._host.stop()
+        self._bootstrap.stop()
 
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:
         if not args:
@@ -98,7 +97,7 @@ class PlaceholderAPIPlugin(Plugin):
                 player = sender
 
         assert text is not None
-        service = self._host.service
+        service = self._bootstrap.service
         if service is None or not service.active:
             sender.send_error_message("PlaceholderAPI is not active.")
             return True
@@ -107,7 +106,7 @@ class PlaceholderAPIPlugin(Plugin):
         return True
 
     def _handle_list(self, sender: CommandSender) -> bool:
-        service = self._host.service
+        service = self._bootstrap.service
         if service is None or not service.active:
             sender.send_error_message("PlaceholderAPI is not active.")
             return True
@@ -128,7 +127,7 @@ class PlaceholderAPIPlugin(Plugin):
             return True
 
         identifier = args[0]
-        service = self._host.service
+        service = self._bootstrap.service
         if service is None or not service.active:
             sender.send_error_message("PlaceholderAPI is not active.")
             return True
