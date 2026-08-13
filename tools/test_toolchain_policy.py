@@ -16,10 +16,12 @@ sys.modules[REPAIR_SPEC.name] = repair_wheel
 REPAIR_SPEC.loader.exec_module(repair_wheel)
 
 
-def test_cmake_requires_and_records_clang_20() -> None:
+def test_cmake_requires_endstone_compiler_family_and_records_provenance() -> None:
     source = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    assert "CMAKE_CXX_COMPILER_VERSION VERSION_LESS 20" in source
-    assert "CMAKE_CXX_COMPILER_VERSION VERSION_LESS 21" in source
+    assert 'CMAKE_CXX_COMPILER_ID MATCHES "Clang"' in source
+    assert 'CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"' in source
+    assert "CMAKE_LINKER_TYPE LLD" in source
+    assert "CMAKE_CXX_COMPILER_VERSION VERSION_LESS" not in source
     assert "toolchain_provenance.txt" in source
     assert "_toolchain_provenance.txt" in source
 
@@ -60,6 +62,12 @@ def test_conan_and_pep517_backend_are_exactly_constrained() -> None:
     assert '"c": "/usr/bin/clang-20"' in profile
     assert '"cpp": "/usr/bin/clang++-20"' in profile
     assert "detect_clang_compiler" not in profile
+
+
+def test_official_windows_build_still_pins_clang_cl_20() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+    assert "Select clang-cl 20" in workflow
+    assert 'Select-String "clang version 20\\."' in workflow
 
 
 def test_wheel_validation_requires_compiler_provenance() -> None:

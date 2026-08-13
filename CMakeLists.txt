@@ -2,12 +2,6 @@ cmake_minimum_required(VERSION 3.29)
 
 project(papi VERSION 0.1.0 LANGUAGES CXX)
 
-if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 20 OR NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 21)
-    message(FATAL_ERROR
-            "endstone_papi: Clang 20 is required for the supported Endstone ABI, but CMake detected "
-            "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}.")
-endif ()
-
 # Generate the public version header from the CMake project version so that
 # getVersion() is header-only and CMakeLists.txt is the single version source.
 configure_file(
