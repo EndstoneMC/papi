@@ -1,4 +1,4 @@
-// Relational placeholder dispatch: test matrix REL-001 through REL-008.
+// Relational placeholder dispatch: test matrix .
 
 #include <gtest/gtest.h>
 
@@ -42,8 +42,6 @@ protected:
     FakePlayer alice_{"Alice", endstone::UUID{{1}}};
     FakePlayer bob_{"Bob", endstone::UUID{{2}}};
 };
-
-// REL-001
 TEST_F(RelationalTest, ResolvesWithBothExactPlayers)
 {
     auto expansion = addRelational("friends");
@@ -68,8 +66,6 @@ TEST_F(RelationalTest, PlayerOrderIsPreserved)
     EXPECT_EQ(expansion->last_relational_one, &bob_);
     EXPECT_EQ(expansion->last_relational_two, &alice_);
 }
-
-// REL-002
 TEST_F(RelationalTest, IdentifierIsLowercasedAndParamsPreserved)
 {
     auto expansion = addRelational("friends");
@@ -80,8 +76,6 @@ TEST_F(RelationalTest, IdentifierIsLowercasedAndParamsPreserved)
     // Only the identifier is canonicalized; parameters keep their exact bytes.
     EXPECT_EQ(expansion->last_relational_params, "Since_When");
 }
-
-// REL-003
 TEST_F(RelationalTest, UnknownIdentifierStaysLiteral)
 {
     addRelational("friends");
@@ -89,7 +83,7 @@ TEST_F(RelationalTest, UnknownIdentifierStaysLiteral)
     EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel_missing_x}"), "{rel_missing_x}");
 }
 
-// REL-004: a registered but non-relational expansion must not be consulted at all.
+// a registered but non-relational expansion must not be consulted at all.
 TEST_F(RelationalTest, NonRelationalExpansionIsNotDispatched)
 {
     auto ordinary = std::make_shared<FakeExpansion>("friends");
@@ -103,8 +97,6 @@ TEST_F(RelationalTest, NonRelationalExpansionIsNotDispatched)
     EXPECT_EQ(ordinary->relational_calls, 0);
     EXPECT_EQ(ordinary->request_calls, 0);
 }
-
-// REL-005
 TEST_F(RelationalTest, NullValueAndExceptionsStayLiteral)
 {
     auto declining = addRelational("friends");
@@ -132,8 +124,6 @@ TEST_F(RelationalTest, RepeatedRelationalFailuresAreThrottled)
     }
     EXPECT_EQ(platform_->logger.countAtLeast(endstone::Logger::Error), 1U);
 }
-
-// REL-006
 TEST_F(RelationalTest, MalformedRelationalTokensStayLiteral)
 {
     addRelational("friends");
@@ -153,7 +143,7 @@ TEST_F(RelationalTest, MalformedRelationalTokensStayLiteral)
     }
 }
 
-// REL-007: the two namespaces must not cross-dispatch.
+// the two namespaces must not cross-dispatch.
 TEST_F(RelationalTest, OrdinaryParsingNeverInvokesTheRelationalCallback)
 {
     auto expansion = addRelational("friends");

@@ -1,5 +1,4 @@
-// Ownership and teardown ordering: LIFE-005, LIFE-007, THR-004, EXC-002, EXC-005, and
-// the module-unload guarantees from OWN-001.
+// Ownership, teardown ordering, exception containment, and module-unload guarantees.
 
 #include <atomic>
 #include <chrono>
@@ -97,7 +96,7 @@ protected:
     FakePlugin owner_{"provider"};
 };
 
-// OWN-001 with module semantics: the provider object must be gone before its module.
+// With module semantics, the provider object must be gone before its module.
 TEST_F(LifecycleTest, ProviderIsReleasedBeforeItsModuleUnloads)
 {
     bool module_loaded = true;
@@ -148,7 +147,7 @@ TEST_F(LifecycleTest, ExplicitUnregisterReleasesTheProviderImmediately)
     module_loaded = false;
 }
 
-// LIFE-005: a server reload disables and clears every plugin, then enables them again.
+// A server reload disables and clears every plugin, then enables them again.
 TEST_F(LifecycleTest, ServerReloadLeavesNoCallableBehindAndAllowsFreshRegistration)
 {
     bool first_module = true;
@@ -189,7 +188,7 @@ TEST_F(LifecycleTest, ServerReloadLeavesNoCallableBehindAndAllowsFreshRegistrati
     second_module = false;
 }
 
-// LIFE-007: PAPI's own disable must not depend on receiving its own disable event.
+// PAPI's own disable must not depend on receiving its own disable event.
 TEST_F(LifecycleTest, PapiTearsDownWithoutRelyingOnItsOwnDisableEvent)
 {
     auto expansion = std::make_shared<FakeExpansion>("demo");
@@ -207,7 +206,7 @@ TEST_F(LifecycleTest, PapiTearsDownWithoutRelyingOnItsOwnDisableEvent)
     EXPECT_EQ(expansion->unregister_calls, 1);
 }
 
-// THR-004: a metadata query must not wait on provider code.
+// A metadata query must not wait on provider code.
 TEST_F(LifecycleTest, MetadataQueriesCompleteWhileAProviderCallbackIsBlocked)
 {
     std::atomic<bool> inside_callback{false};
@@ -274,7 +273,7 @@ TEST_F(LifecycleTest, UnregisterIsVisibleImmediatelyEvenWhileACallbackRuns)
     EXPECT_EQ(expansion->unregister_calls, 1);
 }
 
-// T-011: the ExpansionUnregisteredEvent must fire after onUnregister and provider
+// The ExpansionUnregisteredEvent must fire after onUnregister and provider
 // release, not before them. When cleanup is deferred by an active call lease, the
 // event is dispatched from the deferred cleanup continuation, so a listener that
 // checks cleanup state sees a fully torn-down expansion.
@@ -315,8 +314,6 @@ TEST_F(LifecycleTest, UnregisterEventFiresAfterDeferredCleanup)
     EXPECT_EQ(platform_->events[0].name, "ExpansionUnregisteredEvent");
     EXPECT_EQ(platform_->events[0].reason, UnregisterReason::Explicit);
 }
-
-// EXC-002
 TEST_F(LifecycleTest, NonStandardExceptionsAreContained)
 {
     auto expansion = std::make_shared<NonStandardThrowingExpansion>();
@@ -344,7 +341,7 @@ TEST_F(LifecycleTest, ServiceStaysUsableAfterAProviderFails)
     EXPECT_TRUE(service_->isActive());
 }
 
-// EXC-004 at the service level: throttle state is released with its entry.
+// Throttle state is released with its entry at the service level.
 TEST_F(LifecycleTest, ThrottleStateDoesNotAccumulateAcrossRegistrations)
 {
     for (int round = 0; round < 200; ++round) {
@@ -390,12 +387,12 @@ TEST_F(LifecycleTest, ProviderReceivesTheOfflinePlayerItWasGiven)
     EXPECT_EQ(expansion->last_player->getName(), "Alice");
     EXPECT_EQ(expansion->last_player->getUniqueId(), alice.getUniqueId());
 
-    // PAR-017: a null player is a supported input, not an error.
+    // a null player is a supported input, not an error.
     (void)service_->setPlaceholders(nullptr, "{player_name}");
     EXPECT_EQ(expansion->last_player, nullptr);
 }
 
-// EXC-005: the containment boundary is documented honestly. Only C++ exceptions are
+// The containment boundary is documented honestly. Only C++ exceptions are
 // caught; access violations, signals, and undefined behavior are not claimed.
 TEST_F(LifecycleTest, ContainmentCoversExceptionsOnly)
 {

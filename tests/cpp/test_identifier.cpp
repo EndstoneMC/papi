@@ -1,4 +1,4 @@
-// ADR-015: the registration grammar is strict, ASCII-only, and locale-independent.
+// the registration grammar is strict, ASCII-only, and locale-independent.
 
 #include <clocale>
 

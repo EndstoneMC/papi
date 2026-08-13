@@ -1,4 +1,4 @@
-"""Command metadata and event surface: CMD-001 through CMD-005, EVT-004.
+"""Command metadata and event surface tests.
 
 The command handler is exercised against stand-in senders rather than a live server,
 because the point of these tests is that malformed input cannot assert or crash. Event
@@ -61,7 +61,6 @@ def make_plugin(service: object | None) -> PlaceholderAPIPlugin:
     return plugin
 
 
-# CMD-005
 def test_command_and_permission_metadata_is_declared() -> None:
     commands = PlaceholderAPIPlugin.commands
     assert "papi" in commands
@@ -75,14 +74,14 @@ def test_command_and_permission_metadata_is_declared() -> None:
     assert "list" in usages
     assert "info" in usages
 
-    # ADR-014: there is deliberately no reload command.
+    # There is deliberately no reload command.
     assert "reload" not in usages
 
     permissions = PlaceholderAPIPlugin.permissions
     assert permissions["papi.command.papi"]["default"] == "op"
 
 
-# CMD-002: malformed input must never assert or raise.
+# Malformed input must never assert or raise.
 def test_no_arguments_reports_usage_instead_of_raising() -> None:
     plugin = make_plugin(StubService())
     # Returning False makes Endstone print the declared usage.
@@ -126,7 +125,6 @@ def test_extra_parse_arguments_are_joined_into_the_text() -> None:
     assert sender.messages == ["parsed:hello {a_b} world"]
 
 
-# CMD-001
 def test_parse_with_explicit_null_target_passes_no_player() -> None:
     service = StubService()
     plugin = make_plugin(service)
@@ -148,7 +146,6 @@ def test_parse_rejects_me_from_a_non_player_sender() -> None:
     assert not service.parsed
 
 
-# CMD-003
 def test_list_reports_every_identifier_deterministically() -> None:
     service = StubService()
     plugin = make_plugin(service)
@@ -172,7 +169,6 @@ def test_list_reports_an_empty_registry_clearly() -> None:
     assert any("No expansions" in message for message in sender.messages)
 
 
-# CMD-004
 def test_info_reports_not_found_for_an_unknown_identifier() -> None:
     plugin = make_plugin(StubService())
     sender = RecordingSender()
@@ -192,7 +188,7 @@ def test_commands_refuse_when_the_service_is_unavailable() -> None:
             assert not sender.messages
 
 
-# EVT-004: an event exposes copied metadata and a reason, never a provider object.
+# An event exposes copied metadata and a reason, never a provider object.
 def test_events_expose_only_metadata() -> None:
     for event_type in (endstone_papi.ExpansionRegisteredEvent, endstone_papi.ExpansionUnregisteredEvent):
         assert hasattr(event_type, "expansion_info")

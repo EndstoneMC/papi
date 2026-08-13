@@ -1,4 +1,4 @@
-"""T-014: service-backed Python interop through the full native round-trip.
+"""Service-backed Python interop through the full native round-trip.
 
 test_interop.py exercises the Python expansion contract directly (subclass, metadata,
 return-type checks). test_parse_reentrancy.py exercises the error paths through the

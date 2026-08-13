@@ -1,4 +1,4 @@
-// PR2-006: Exercise the documented provider-owned std::shared_ptr ABI across a
+// Exercise the documented provider-owned std::shared_ptr ABI across a
 // separately linked module boundary.
 
 #ifdef _WIN32

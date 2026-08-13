@@ -1,4 +1,4 @@
-"""C++/Python interoperability: test matrix INT-001 through INT-015.
+"""C++/Python interoperability tests.
 
 These exercise the Python side of the shared registry: a Python subclass registered
 through the native service, the strict return-type contract, contained tracebacks, and
@@ -55,7 +55,7 @@ def test_expansion_is_subclassable_and_reports_metadata() -> None:
     assert expansion.supports_player_cleanup() is False
 
 
-# INT-005, INT-006: a null player arrives as None, and None means unresolved.
+# A null player arrives as None, and None means unresolved.
 def test_on_request_accepts_none_player_and_may_decline() -> None:
     expansion = DemoExpansion()
 
@@ -107,7 +107,7 @@ def test_expansion_defaults_are_inherited_not_required() -> None:
     assert expansion.on_unregister(UnregisterReason.EXPLICIT) is None
 
 
-# INT-007: a wrong return type is a contained provider error, never coerced.
+# A wrong return type is a contained provider error, never coerced.
 def test_wrong_return_type_is_rejected_rather_than_coerced() -> None:
     class BadReturn(PlaceholderExpansion):
         identifier = "bad"
@@ -157,7 +157,7 @@ def test_non_string_metadata_is_reported_clearly() -> None:
     assert "str" in str(excinfo.value)
 
 
-# INT-008: a raising override surfaces as an error with its traceback, and does not
+# A raising override surfaces as an error with its traceback, and does not
 # escape as a Python exception through native code.
 def test_raising_override_propagates_as_an_error() -> None:
     class Raiser(PlaceholderExpansion):

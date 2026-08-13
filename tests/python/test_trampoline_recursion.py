@@ -1,4 +1,4 @@
-"""T-004 regression: trampoline super()/.member re-entry is bounded.
+"""Trampoline super()/.member re-entry is bounded.
 
 A Python override that calls ``super().member`` re-enters the pybind base property,
 which dispatches back into the trampoline, which calls ``subclassMember`` again for

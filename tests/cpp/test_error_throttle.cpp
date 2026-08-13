@@ -1,4 +1,4 @@
-// Bounded error suppression: test matrix EXC-003 and EXC-004.
+// Bounded error suppression: test matrix and .
 
 #include <thread>
 #include <vector>
@@ -23,8 +23,6 @@ public:
 private:
     std::chrono::steady_clock::time_point now_;
 };
-
-// EXC-003
 TEST(ErrorThrottle, LogsOnceThenSuppressesForTheWindow)
 {
     ManualClock clock;
@@ -91,7 +89,7 @@ TEST(ErrorThrottle, EveryOperationHasItsOwnWindow)
     EXPECT_EQ(throttle.trackedScopes(), 1U);
 }
 
-// EXC-004: throttle memory is released with the entries it describes.
+// throttle memory is released with the entries it describes.
 TEST(ErrorThrottle, StateIsDroppedWithTheEntryItBelongsTo)
 {
     ErrorThrottle throttle;

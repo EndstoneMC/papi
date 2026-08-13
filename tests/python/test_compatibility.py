@@ -14,7 +14,6 @@ import pytest
 import endstone_papi
 
 
-# COM-005
 def test_old_python_service_constructor_is_unavailable() -> None:
     # 0.0.1 exposed PlaceholderAPI(plugin) and expected plugins to subclass it. Both are
     # gone: the service is native, and Python consumes it.
@@ -36,8 +35,8 @@ def test_architecture_a_modules_are_removed() -> None:
 
 
 def test_no_business_placeholders_are_shipped() -> None:
-    # ADR-002: the core is a framework. Nothing that looks like a built-in provider may
-    # appear on the public surface.
+    # The core is a framework. Nothing that looks like a built-in provider may appear on
+    # the public surface.
     exported = set(endstone_papi.__all__)
     for business in (
         "player_name",
@@ -73,8 +72,8 @@ def test_replacement_surface_is_exported() -> None:
 
 
 def test_no_mutable_manager_is_reachable() -> None:
-    # ADR-007: the registry is private. Introspection returns copies, and there is no
-    # public handle that could bypass lifecycle validation.
+    # The registry is private. Introspection returns copies, and there is no public
+    # handle that could bypass lifecycle validation.
     for internal in ("ExpansionManager", "_ExpansionManager", "registry", "_registry"):
         assert not hasattr(endstone_papi, internal), internal
 

@@ -1,7 +1,7 @@
 """Verifies the module-unload assumption the inert-service design depends on.
 
-ADR-006 lets a consumer keep a service reference after PAPI is disabled, on the condition
-that the extension binary providing that object's vtable stays loaded. Endstone's Python
+A consumer may keep a service reference after PAPI is disabled, on the condition that
+the extension binary providing that object's vtable stays loaded. Endstone's Python
 loader invalidates ``endstone_*`` imports on reload by deleting them from ``sys.modules``,
 so this asserts what that actually does to the loaded OS module: if deleting and
 collecting the extension unloaded the binary, a retained inert service would become a
@@ -76,8 +76,8 @@ def test_extension_binary_survives_import_invalidation() -> None:
     if verdict == "SKIP":
         pytest.skip("could not resolve the extension module handle by name")
 
-    # If this ever reports UNLOADED, ADR-006 is disproven on this platform and a retained
-    # service can no longer be made safely inert.
+    # If this ever reports UNLOADED, a retained service can no longer be made safely inert
+    # on this platform.
     assert verdict == "STILL_LOADED", (
         "the extension binary was unloaded after import invalidation, so a consumer's "
         "retained inert service would dangle"

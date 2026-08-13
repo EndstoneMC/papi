@@ -1,4 +1,4 @@
-// Registry and metadata behavior: test matrix REG-001 through REG-017.
+// Registry and metadata behavior: test matrix .
 
 #include <atomic>
 #include <thread>
@@ -45,8 +45,6 @@ protected:
     FakePlugin owner_{"provider"};
     FakePlugin other_owner_{"other"};
 };
-
-// REG-001
 TEST_F(ExpansionManagerTest, RegistersValidExpansionAndCopiesMetadata)
 {
     auto expansion = std::make_shared<FakeExpansion>("Demo");
@@ -68,8 +66,6 @@ TEST_F(ExpansionManagerTest, RegistersValidExpansionAndCopiesMetadata)
     ASSERT_EQ(manager_.size(), 1U);
     EXPECT_TRUE(manager_.isRegistered("demo"));
 }
-
-// REG-002
 TEST_F(ExpansionManagerTest, IdentifierLookupIsCaseInsensitiveAndStoredLowercase)
 {
     add("Demo", owner_);
@@ -80,8 +76,6 @@ TEST_F(ExpansionManagerTest, IdentifierLookupIsCaseInsensitiveAndStoredLowercase
     ASSERT_EQ(manager_.getRegisteredIdentifiers().size(), 1U);
     EXPECT_EQ(manager_.getRegisteredIdentifiers().front(), "demo");
 }
-
-// REG-003
 TEST_F(ExpansionManagerTest, DuplicateCanonicalIdentifierFailsAtomically)
 {
     auto first = add("demo", owner_);
@@ -103,8 +97,6 @@ TEST_F(ExpansionManagerTest, DuplicateCanonicalIdentifierFailsAtomically)
     EXPECT_EQ(entry->getExpansion().get(), first.get());
     EXPECT_FALSE(manager_.isRegistered("other"));
 }
-
-// REG-004
 TEST_F(ExpansionManagerTest, RejectsEveryInvalidIdentifierClass)
 {
     const std::vector<std::string> invalid = {
@@ -123,8 +115,6 @@ TEST_F(ExpansionManagerTest, RejectsEveryInvalidIdentifierClass)
     }
     EXPECT_EQ(manager_.size(), 0U);
 }
-
-// REG-005
 TEST_F(ExpansionManagerTest, AcceptsAlphanumericDottedAndHyphenatedIdentifiers)
 {
     const std::vector<std::pair<std::string, std::string>> cases = {
@@ -147,8 +137,6 @@ TEST_F(ExpansionManagerTest, AcceptsAlphanumericDottedAndHyphenatedIdentifiers)
     }
     EXPECT_EQ(manager_.size(), cases.size());
 }
-
-// REG-006
 TEST_F(ExpansionManagerTest, EmptyOrThrowingMetadataFailsWithoutSideEffects)
 {
     auto no_author = std::make_shared<FakeExpansion>("demo");
@@ -181,8 +169,6 @@ TEST_F(ExpansionManagerTest, MissingNameFallsBackToIdentifier)
     ASSERT_TRUE(result.registered);
     EXPECT_EQ(result.info.name, "demo");
 }
-
-// REG-007
 TEST_F(ExpansionManagerTest, PreflightRefusalPreventsRegistration)
 {
     auto expansion = std::make_shared<FakeExpansion>("demo");
@@ -205,8 +191,6 @@ TEST_F(ExpansionManagerTest, ThrowingPreflightIsContained)
     EXPECT_EQ(result.error, RegisterError::ProviderThrew);
     EXPECT_EQ(manager_.size(), 0U);
 }
-
-// REG-008
 TEST_F(ExpansionManagerTest, DisabledOwnerCannotRegister)
 {
     platform_.disable(owner_);
@@ -226,8 +210,6 @@ TEST_F(ExpansionManagerTest, NullExpansionIsRejected)
     EXPECT_FALSE(result.registered);
     EXPECT_EQ(result.error, RegisterError::NullExpansion);
 }
-
-// REG-009
 TEST_F(ExpansionManagerTest, MissingOrDisabledRequiredPluginFails)
 {
     auto absent = std::make_shared<FakeExpansion>("demo");
@@ -245,8 +227,6 @@ TEST_F(ExpansionManagerTest, MissingOrDisabledRequiredPluginFails)
 
     EXPECT_EQ(manager_.size(), 0U);
 }
-
-// REG-010
 TEST_F(ExpansionManagerTest, EnabledRequiredPluginIsAcceptedAndCopied)
 {
     FakePlugin economy{"economy"};
@@ -273,8 +253,6 @@ TEST_F(ExpansionManagerTest, RequiredPluginNameIsCaseSensitive)
     EXPECT_FALSE(result.registered);
     EXPECT_EQ(result.error, RegisterError::RequiredPluginUnavailable);
 }
-
-// REG-011
 TEST_F(ExpansionManagerTest, DetachRemovesEntryImmediately)
 {
     add("demo", owner_);
@@ -304,8 +282,6 @@ TEST_F(ExpansionManagerTest, DetachOfUnknownOrInvalidIdentifierFails)
     EXPECT_FALSE(manager_.detach(owner_, "not a valid id", UnregisterReason::Explicit).has_value());
     EXPECT_EQ(manager_.size(), 1U);
 }
-
-// REG-012
 TEST_F(ExpansionManagerTest, WrongOwnerCannotDetach)
 {
     add("demo", owner_);
@@ -314,8 +290,6 @@ TEST_F(ExpansionManagerTest, WrongOwnerCannotDetach)
     EXPECT_EQ(manager_.size(), 1U);
     EXPECT_TRUE(manager_.isRegistered("demo"));
 }
-
-// REG-013
 TEST_F(ExpansionManagerTest, BulkDetachRemovesOnlyOwnEntries)
 {
     add("beta", owner_);
@@ -333,8 +307,6 @@ TEST_F(ExpansionManagerTest, BulkDetachRemovesOnlyOwnEntries)
     EXPECT_EQ(manager_.size(), 1U);
     EXPECT_TRUE(manager_.isRegistered("theirs"));
 }
-
-// REG-014
 TEST_F(ExpansionManagerTest, IntrospectionIsSortedAndCopiesOnly)
 {
     add("zulu", owner_);
@@ -360,8 +332,6 @@ TEST_F(ExpansionManagerTest, IntrospectionIsSortedAndCopiesOnly)
     mutated[0].identifier = "hacked";
     EXPECT_EQ(manager_.getExpansions()[0].identifier, "alpha");
 }
-
-// REG-015
 TEST_F(ExpansionManagerTest, MetadataCopySurvivesUnregisterAndProviderDestruction)
 {
     int destroyed = 0;
@@ -415,14 +385,14 @@ TEST_F(ExpansionManagerTest, RetiredEntryClearsOwnerIdentity)
     auto removed = manager_.detach(owner_, "demo", UnregisterReason::Explicit);
     ASSERT_TRUE(removed.has_value());
 
-    // T-025: owner_ is cleared atomically at retirement, not deferred to cleanup.
+    // owner_ is cleared atomically at retirement, not deferred to cleanup.
     // The copied ExpansionInfo.owner string is still available for diagnostics.
     EXPECT_EQ(removed->entry->getOwner(), nullptr);
     EXPECT_FALSE(removed->entry->isOwnedBy(owner_));
     EXPECT_EQ(removed->info.owner, owner_.getName());
 }
 
-// T-025: even when cleanup is deferred by an active call lease, the retired
+// even when cleanup is deferred by an active call lease, the retired
 // entry's raw owner identity must be null immediately.  The self-unregister
 // case -- a provider unregistering from inside its own callback -- is the
 // scenario where the deferred window is longest.
@@ -480,7 +450,7 @@ TEST_F(ExpansionManagerTest, LeaseIsGrantedOnlyForActiveEntries)
     EXPECT_FALSE(static_cast<bool>(manager_.lease("demo")));
 }
 
-// REG-016: a provider that unregisters itself from inside its callback must not be
+// a provider that unregisters itself from inside its callback must not be
 // destroyed underneath its own stack frame.
 TEST_F(ExpansionManagerTest, CleanupIsDeferredWhileACallIsInFlight)
 {
@@ -554,7 +524,7 @@ TEST_F(ExpansionManagerTest, DetachForDisabledPluginRemovesOwnedAndDependentEntr
     EXPECT_TRUE(manager_.isRegistered("unrelated"));
 }
 
-// OWN-004: an entry that both belongs to and depends on the disabled plugin is
+// an entry that both belongs to and depends on the disabled plugin is
 // removed exactly once.
 TEST_F(ExpansionManagerTest, OwnedAndDependentEntryIsRemovedOnce)
 {
@@ -618,8 +588,6 @@ TEST_F(ExpansionManagerTest, RelationalCapabilityIsCopiedNotProbed)
     relational->relational = false;
     EXPECT_TRUE(manager_.findCanonical("rel")->supportsRelationalPlaceholders());
 }
-
-// REG-017
 TEST_F(ExpansionManagerTest, MetadataQueriesAreSafeWhileTheRegistryMutates)
 {
     std::atomic<bool> stop{false};

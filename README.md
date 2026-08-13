@@ -5,10 +5,6 @@ inspired by the PlaceholderAPI plugin for Spigot. C++ and Python plugins are equ
 providers: both implement the same expansion contract and share one registry, so a
 consumer never needs to know which language a placeholder came from.
 
-> [!NOTE]
-> The 0.1.0 rewrite is under development. Candidate builds are available from
-> [GitHub Actions](https://github.com/EndstoneMC/papi/actions/workflows/build.yml).
-
 ## Install
 
 - Download the `.whl` from [releases](https://github.com/EndstoneMC/papi/releases) or

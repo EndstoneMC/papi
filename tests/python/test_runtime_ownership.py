@@ -1,4 +1,4 @@
-"""Regression tests for PR2-004 / PR2-005: Linux runtime ownership and package contract.
+"""Regression tests for Linux runtime ownership and the package contract.
 
 These tests verify the source-level contracts that replace the old import-time
 mutation of site-packages:
@@ -22,11 +22,6 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 _INIT_PY = _REPO_ROOT / "endstone_papi" / "__init__.py"
 _PYPROJECT = _REPO_ROOT / "pyproject.toml"
 _REPAIR_SCRIPT = _REPO_ROOT / "tools" / "repair_wheel.py"
-
-
-# ---------------------------------------------------------------------------
-# PR2-005: No import-time mutation of site-packages
-# ---------------------------------------------------------------------------
 
 
 def test_init_py_does_not_call_os_symlink_or_remove() -> None:
@@ -69,11 +64,6 @@ def test_no_libc_symlinks_in_package_directory() -> None:
         assert not (pkg_dir / soname).exists(), f"{soname} must not exist in package directory"
 
 
-# ---------------------------------------------------------------------------
-# PR2-004: Endstone runtime dependency is declared
-# ---------------------------------------------------------------------------
-
-
 def test_pyproject_declares_endstone_runtime_dependency() -> None:
     """pyproject.toml must declare endstone as a runtime dependency."""
     content = _PYPROJECT.read_text(encoding="utf-8")
@@ -91,11 +81,6 @@ def test_pyproject_repair_wheel_uses_custom_script() -> None:
     """repair-wheel-command must use tools/repair_wheel.py, not bare auditwheel."""
     content = _PYPROJECT.read_text(encoding="utf-8")
     assert "tools/repair_wheel.py" in content, "repair-wheel-command must use the custom script"
-
-
-# ---------------------------------------------------------------------------
-# PR2-005: Build-time NEEDED patching via tools/repair_wheel.py
-# ---------------------------------------------------------------------------
 
 
 def test_repair_wheel_script_exists() -> None:

@@ -1,5 +1,4 @@
-// Native service behavior: LIFE-001, PAR-023, PAR-024, INT-001, and the C++ side of
-// error containment and thread policy.
+// Native service behavior, including error containment and thread policy.
 
 #include <thread>
 
@@ -58,8 +57,6 @@ protected:
     FakePlugin other_owner_{"other"};
     FakePlayer alice_{"Alice", endstone::UUID{{1}}};
 };
-
-// LIFE-001
 TEST_F(ServiceTest, StartsActive)
 {
     EXPECT_TRUE(service_->isActive());
@@ -67,7 +64,7 @@ TEST_F(ServiceTest, StartsActive)
     EXPECT_TRUE(service_->getRegisteredIdentifiers().empty());
 }
 
-// INT-001: a C++ expansion answering a C++ consumer.
+// A C++ expansion answering a C++ consumer.
 TEST_F(ServiceTest, ResolvesThroughARegisteredExpansion)
 {
     auto expansion = add("player", owner_);
@@ -120,8 +117,6 @@ TEST_F(ServiceTest, IsRegisteredRejectsInvalidQueries)
     EXPECT_FALSE(service_->isRegistered(""));
     EXPECT_FALSE(service_->isRegistered("{demo}"));
 }
-
-// EVT-001, EVT-002
 TEST_F(ServiceTest, EmitsOneRegisteredEventOnlyOnSuccess)
 {
     add("demo", owner_);
@@ -136,7 +131,7 @@ TEST_F(ServiceTest, EmitsOneRegisteredEventOnlyOnSuccess)
     EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 1U);
 }
 
-// T-003: a metadata exception is contained by the core's invokeProvider boundary and
+// A metadata exception is contained by the core's invokeProvider boundary and
 // surfaces as an atomic registration failure - no event, no partial registry state.
 TEST_F(ServiceTest, MetadataExceptionDuringRegistrationIsAtomic)
 {
@@ -148,7 +143,7 @@ TEST_F(ServiceTest, MetadataExceptionDuringRegistrationIsAtomic)
     EXPECT_TRUE(platform_->logger.anyContains("reading its metadata raised an error"));
 }
 
-// T-003: a preflight (canRegister) exception is contained the same way as a metadata
+// A preflight (canRegister) exception is contained the same way as a metadata
 // exception, because both cross the same invokeProvider boundary.
 TEST_F(ServiceTest, PreflightExceptionDuringRegistrationIsAtomic)
 {
@@ -160,7 +155,7 @@ TEST_F(ServiceTest, PreflightExceptionDuringRegistrationIsAtomic)
     EXPECT_TRUE(platform_->logger.anyContains("raised an error during its registration check"));
 }
 
-// T-005: a self-parse cycle (expansion A resolves a placeholder by calling
+// A self-parse cycle (expansion A resolves a placeholder by calling
 // setPlaceholders("{a_x}")) is bounded by the active-expansion cycle detector.
 // The original token is preserved and a throttled diagnostic is logged.
 TEST_F(ServiceTest, SelfParseCycleIsBounded)
@@ -177,7 +172,7 @@ TEST_F(ServiceTest, SelfParseCycleIsBounded)
     EXPECT_TRUE(platform_->logger.anyContains("cycle detected"));
 }
 
-// T-005: an indirect cycle (A -> B -> A) is bounded the same way. B resolves normally
+// An indirect cycle (A -> B -> A) is bounded the same way. B resolves normally
 // on the first pass; when B's callback re-enters A, the cycle is detected.
 TEST_F(ServiceTest, IndirectParseCycleIsBounded)
 {
@@ -220,7 +215,7 @@ TEST_F(ServiceTest, NestedParsingAcrossServicesDoesNotAliasManagerLocalGeneratio
     EXPECT_FALSE(platform_->logger.anyContains("cycle detected"));
 }
 
-// T-005: a deep but non-cyclic chain that exceeds the depth budget is bounded.
+// A deep but non-cyclic chain that exceeds the depth budget is bounded.
 // The budget violation preserves the input text unchanged.
 TEST_F(ServiceTest, ParseDepthBudgetIsEnforced)
 {
@@ -277,8 +272,6 @@ TEST_F(ServiceTest, BulkUnregisterReportsAndCleansEveryEntry)
     EXPECT_EQ(b->unregister_calls, 1);
     EXPECT_TRUE(service_->isRegistered("theirs"));
 }
-
-// PAR-024, EXC-001
 TEST_F(ServiceTest, ProviderExceptionsArePreservedAsLiteralTokens)
 {
     auto expansion = add("player", owner_);
@@ -290,7 +283,7 @@ TEST_F(ServiceTest, ProviderExceptionsArePreservedAsLiteralTokens)
     EXPECT_TRUE(platform_->logger.anyContains("ordinary"));
 }
 
-// EXC-003 at the service level: a failing provider cannot flood the log.
+// A failing provider cannot flood the log at the service level.
 TEST_F(ServiceTest, RepeatedProviderFailuresAreThrottled)
 {
     std::chrono::steady_clock::time_point now{};
@@ -309,8 +302,6 @@ TEST_F(ServiceTest, RepeatedProviderFailuresAreThrottled)
     EXPECT_EQ(platform_->logger.countAtLeast(endstone::Logger::Error), 2U);
     EXPECT_TRUE(platform_->logger.anyContains("suppressed"));
 }
-
-// THR-001
 TEST_F(ServiceTest, ParsingOffThePrimaryThreadPreservesInputAndDoesNotCallProviders)
 {
     auto expansion = add("player", owner_);
@@ -320,8 +311,6 @@ TEST_F(ServiceTest, ParsingOffThePrimaryThreadPreservesInputAndDoesNotCallProvid
     EXPECT_EQ(expansion->request_calls, 0);
     EXPECT_TRUE(platform_->logger.anyContains("server thread"));
 }
-
-// THR-002
 TEST_F(ServiceTest, MutationOffThePrimaryThreadFailsWithoutTouchingProviders)
 {
     add("existing", owner_);
@@ -337,8 +326,6 @@ TEST_F(ServiceTest, MutationOffThePrimaryThreadFailsWithoutTouchingProviders)
     EXPECT_TRUE(service_->isRegistered("existing"));
     EXPECT_FALSE(service_->isRegistered("demo"));
 }
-
-// THR-003
 TEST_F(ServiceTest, PureQueriesAreSafeFromOtherThreads)
 {
     add("demo", owner_);
@@ -353,7 +340,7 @@ TEST_F(ServiceTest, PureQueriesAreSafeFromOtherThreads)
     worker.join();
 }
 
-// PAR-023, LIFE-002: a retained pointer must be inert, not dangerous.
+// A retained pointer must be inert, not dangerous.
 TEST_F(ServiceTest, RetainedServiceBecomesInertAfterShutdown)
 {
     auto expansion = add("player", owner_);
@@ -395,8 +382,6 @@ TEST_F(ServiceTest, InertServiceNeverReachesTheProviderOrThePlatform)
     EXPECT_EQ(expansion->request_calls, calls_after_shutdown);
     EXPECT_EQ(platform_->logger.records.size(), logs_after_shutdown);
 }
-
-// LIFE-003
 TEST_F(ServiceTest, ShutdownCleansEveryEntryAndReleasesProviders)
 {
     int destroyed = 0;
@@ -427,8 +412,6 @@ TEST_F(ServiceTest, ShutdownSuppressesUnregisterEvents)
     // unpredictable rather than useful.
     EXPECT_EQ(countEventsNamed("ExpansionUnregisteredEvent"), 0U);
 }
-
-// LIFE-004
 TEST_F(ServiceTest, ShutdownIsIdempotent)
 {
     auto expansion = add("demo", owner_);
@@ -441,7 +424,7 @@ TEST_F(ServiceTest, ShutdownIsIdempotent)
     EXPECT_FALSE(service_->isActive());
 }
 
-// T-023 (A-007): shutdown must be split so the bootstrap can unregister the
+// shutdown must be split so the bootstrap can unregister the
 // named service from the ServiceManager *between* transitioning non-operational
 // and draining the registry.  The onUnregister(PapiShutdown) callback must not
 // see the service as Active, and the registry must still be populated after
@@ -479,8 +462,6 @@ TEST_F(ServiceTest, ShutdownSplitLeavesServiceNonOperationalBeforeDraining)
     service_->finishShutdown();
     EXPECT_EQ(expansion->unregister_calls, 1);
 }
-
-// OWN-002
 TEST_F(ServiceTest, OwnerDisableRemovesOnlyThatOwnersExpansions)
 {
     auto mine_a = add("alpha", owner_);
@@ -497,8 +478,6 @@ TEST_F(ServiceTest, OwnerDisableRemovesOnlyThatOwnersExpansions)
     EXPECT_TRUE(service_->isRegistered("theirs"));
     EXPECT_FALSE(service_->isRegistered("alpha"));
 }
-
-// OWN-003
 TEST_F(ServiceTest, DependencyDisableRemovesDependentsOwnedElsewhere)
 {
     FakePlugin economy{"economy"};
@@ -517,8 +496,6 @@ TEST_F(ServiceTest, DependencyDisableRemovesDependentsOwnedElsewhere)
     EXPECT_EQ(unrelated->unregister_calls, 0);
     EXPECT_TRUE(service_->isRegistered("unrelated"));
 }
-
-// LIFE-006
 TEST_F(ServiceTest, DependencyReturningDoesNotAutoRegisterAnything)
 {
     FakePlugin economy{"economy"};
@@ -536,8 +513,6 @@ TEST_F(ServiceTest, DependencyReturningDoesNotAutoRegisterAnything)
     platform_->enable(economy);
     EXPECT_FALSE(service_->isRegistered("shop"));
 }
-
-// OWN-005
 TEST_F(ServiceTest, CleanupExceptionsDoNotStopRemainingCleanups)
 {
     auto exploding = std::make_shared<FakeExpansion>("alpha");
@@ -552,8 +527,6 @@ TEST_F(ServiceTest, CleanupExceptionsDoNotStopRemainingCleanups)
     EXPECT_EQ(healthy->unregister_calls, 1);
     EXPECT_EQ(service_->getExpansions().size(), 0U);
 }
-
-// OWN-008
 TEST_F(ServiceTest, ProactiveUnregisterThenOwnerDisableIsIdempotent)
 {
     auto expansion = add("demo", owner_);
@@ -565,8 +538,6 @@ TEST_F(ServiceTest, ProactiveUnregisterThenOwnerDisableIsIdempotent)
     service_->handlePluginDisabled(owner_);
     EXPECT_EQ(expansion->unregister_calls, 1);
 }
-
-// OWN-006
 TEST_F(ServiceTest, PlayerQuitReachesOnlyExpansionsThatOptedIn)
 {
     auto opted_in = std::make_shared<FakeExpansion>("cleanup");
@@ -574,7 +545,7 @@ TEST_F(ServiceTest, PlayerQuitReachesOnlyExpansionsThatOptedIn)
     ASSERT_TRUE(service_->registerExpansion(owner_, opted_in));
     auto plain = add("plain", owner_);
 
-    // OWN-007: an expansion that did not opt in is never called.
+    // an expansion that did not opt in is never called.
     service_->handlePlayerQuit(alice_);
     EXPECT_EQ(opted_in->player_quit_calls, 1);
     EXPECT_EQ(plain->player_quit_calls, 0);
@@ -608,7 +579,7 @@ TEST_F(ServiceTest, LifecycleHooksDoNothingOnAnInertService)
     EXPECT_EQ(expansion->unregister_calls, calls);
 }
 
-// REG-016 end to end: a provider unregistering itself mid-callback.
+// A provider unregistering itself mid-callback, exercised end to end.
 TEST_F(ServiceTest, ExpansionCanUnregisterItselfFromInsideItsCallback)
 {
     auto expansion = std::make_shared<FakeExpansion>("player");
@@ -633,8 +604,6 @@ TEST_F(ServiceTest, ExpansionCanUnregisterItselfFromInsideItsCallback)
     EXPECT_EQ(service_->setPlaceholders(nullptr, "{player_x}"), "{player_x}");
     EXPECT_EQ(expansion->request_calls, calls);
 }
-
-// OWN-001
 TEST_F(ServiceTest, ProviderIsDestroyedBeforeItsModuleCouldUnload)
 {
     int destroyed = 0;
@@ -651,7 +620,7 @@ TEST_F(ServiceTest, ProviderIsDestroyedBeforeItsModuleCouldUnload)
     EXPECT_EQ(destroyed, 1);
 }
 
-// COM-004: the historical pipe syntax is gone rather than dual-parsed.
+// The historical pipe syntax is gone rather than dual-parsed.
 TEST_F(ServiceTest, PipeSyntaxIsNoLongerRecognized)
 {
     auto expansion = add("player", owner_);

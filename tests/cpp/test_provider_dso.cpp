@@ -1,4 +1,4 @@
-// T-009: Validate the full external-provider DSO lifecycle.
+// Validate the full external-provider DSO lifecycle.
 //
 // The provider fixture (tests/fixtures/provider/provider_demo.cpp) is a
 // separately linked shared library built against the installed public headers
@@ -181,7 +181,7 @@ TEST_F(ProviderDsoTest, ShutdownDestroysExpansionBeforeUnload)
     EXPECT_EQ(last_reason_(), UnregisterReason::PapiShutdown);
 }
 
-// T-015: A retained shared_ptr<PlaceholderAPI> must remain inert after PAPI
+// A retained shared_ptr<PlaceholderAPI> must remain inert after PAPI
 // shutdown even when the backing provider DSO is unloaded.  The service must
 // not call into the unloaded module -- no vtable dispatch, no callback, no
 // metadata read.  This is the binary-lifetime guarantee that makes a server

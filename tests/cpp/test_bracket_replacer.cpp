@@ -1,4 +1,4 @@
-// Ordinary parser and contains behavior: test matrix PAR-001 through PAR-024.
+// Ordinary parser and contains behavior: test matrix .
 
 #include <chrono>
 #include <functional>
@@ -46,8 +46,6 @@ std::string parse(const std::string_view text, RecordingResolver &resolver)
 {
     return replacePlaceholders(text, resolver);
 }
-
-// PAR-001
 TEST(BracketReplacer, ReplacesASimplePlaceholder)
 {
     RecordingResolver resolver;
@@ -64,8 +62,6 @@ TEST(BracketReplacer, ReplacesASimplePlaceholder)
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "name");
 }
-
-// PAR-002
 TEST(BracketReplacer, LowercasesTheIdentifierAndPreservesParameterCase)
 {
     RecordingResolver resolver;
@@ -74,8 +70,6 @@ TEST(BracketReplacer, LowercasesTheIdentifierAndPreservesParameterCase)
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "NaMe");
 }
-
-// PAR-003
 TEST(BracketReplacer, SplitsOnlyAtTheFirstUnderscore)
 {
     RecordingResolver resolver;
@@ -88,16 +82,12 @@ TEST(BracketReplacer, SplitsOnlyAtTheFirstUnderscore)
     EXPECT_EQ(parse("{player___}", resolver), "<__>");
     EXPECT_EQ(resolver.lookups[0].params, "__");
 }
-
-// PAR-004
 TEST(BracketReplacer, RequiresAnUnderscore)
 {
     RecordingResolver resolver;
     EXPECT_EQ(parse("{player}", resolver), "{player}");
     EXPECT_TRUE(resolver.lookups.empty());
 }
-
-// PAR-005
 TEST(BracketReplacer, DispatchesWithEmptyParameters)
 {
     RecordingResolver resolver;
@@ -110,8 +100,6 @@ TEST(BracketReplacer, DispatchesWithEmptyParameters)
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "");
 }
-
-// PAR-006
 TEST(BracketReplacer, EmptyIdentifierAndEmptyBracesStayLiteral)
 {
     RecordingResolver resolver;
@@ -120,8 +108,6 @@ TEST(BracketReplacer, EmptyIdentifierAndEmptyBracesStayLiteral)
     EXPECT_EQ(parse("{_}", resolver), "{_}");
     EXPECT_TRUE(resolver.lookups.empty());
 }
-
-// PAR-007
 TEST(BracketReplacer, UnknownIdentifierStaysLiteral)
 {
     RecordingResolver resolver;
@@ -129,8 +115,6 @@ TEST(BracketReplacer, UnknownIdentifierStaysLiteral)
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "unknown");
 }
-
-// PAR-008
 TEST(BracketReplacer, DeclinedValueKeepsTheOriginalToken)
 {
     RecordingResolver resolver;
@@ -153,8 +137,6 @@ TEST(BracketReplacer, EmptyStringIsAValidValue)
     // what distinguishes it from declining to resolve.
     EXPECT_EQ(parse("a{player_x}b", resolver), "ab");
 }
-
-// PAR-009
 TEST(BracketReplacer, ReplacesSeveralPlaceholdersInOrderAndKeepsSurroundingText)
 {
     RecordingResolver resolver;
@@ -163,16 +145,12 @@ TEST(BracketReplacer, ReplacesSeveralPlaceholdersInOrderAndKeepsSurroundingText)
     EXPECT_EQ(resolver.lookups[0].params, "x");
     EXPECT_EQ(resolver.lookups[1].params, "y");
 }
-
-// PAR-010
 TEST(BracketReplacer, AdjacentReplacementsConcatenate)
 {
     RecordingResolver resolver;
     EXPECT_EQ(parse("{player_x}{player_y}", resolver), "<x><y>");
     EXPECT_EQ(resolver.lookups.size(), 2U);
 }
-
-// PAR-011
 TEST(BracketReplacer, MalformedBracesStayLiteral)
 {
     RecordingResolver resolver;
@@ -187,8 +165,6 @@ TEST(BracketReplacer, MalformedBracesStayLiteral)
     EXPECT_EQ(parse("{{{", resolver), "{{{");
     EXPECT_TRUE(resolver.lookups.empty());
 }
-
-// PAR-012
 TEST(BracketReplacer, LeadingClosingBraceDoesNotBlockALaterToken)
 {
     RecordingResolver resolver;
@@ -196,8 +172,6 @@ TEST(BracketReplacer, LeadingClosingBraceDoesNotBlockALaterToken)
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].params, "x");
 }
-
-// PAR-013
 TEST(BracketReplacer, SpaceBeforeTheSeparatorInvalidatesTheToken)
 {
     RecordingResolver resolver;
@@ -207,8 +181,6 @@ TEST(BracketReplacer, SpaceBeforeTheSeparatorInvalidatesTheToken)
     EXPECT_EQ(parse("{\tplayer_x}", resolver), "{\tplayer_x}");
     EXPECT_TRUE(resolver.lookups.empty());
 }
-
-// PAR-014
 TEST(BracketReplacer, ParametersPreserveSpacesAndPunctuation)
 {
     RecordingResolver resolver;
@@ -225,7 +197,7 @@ TEST(BracketReplacer, ParametersPreserveSpacesAndPunctuation)
     EXPECT_EQ(resolver.lookups[0].params, " ");
 }
 
-// PAR-015: returned text is output, never input.
+// returned text is output, never input.
 TEST(BracketReplacer, ReplacementValueIsNotReparsed)
 {
     RecordingResolver resolver;
@@ -240,8 +212,6 @@ TEST(BracketReplacer, ReplacementValueIsNotReparsed)
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
 }
-
-// PAR-016
 TEST(BracketReplacer, BraceRichReplacementsSurviveVerbatim)
 {
     RecordingResolver resolver;
@@ -252,8 +222,6 @@ TEST(BracketReplacer, BraceRichReplacementsSurviveVerbatim)
     EXPECT_EQ(parse("{player_x}", resolver), "{{}}{a_b}}}{{");
     EXPECT_EQ(resolver.lookups.size(), 1U);
 }
-
-// PAR-018
 TEST(BracketReplacer, NestingIsNotRecognized)
 {
     RecordingResolver resolver;
@@ -270,8 +238,6 @@ TEST(BracketReplacer, NestingIsNotRecognized)
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "{other_x");
 }
-
-// PAR-019
 TEST(BracketReplacer, InputWithoutCandidatesIsReturnedUnchangedWithoutLookups)
 {
     RecordingResolver resolver;
@@ -292,8 +258,6 @@ TEST(BracketReplacer, BinaryAndUtf8BytesPassThroughUnchanged)
     EXPECT_EQ(parse("{player_caf\xc3\xa9}", resolver), "<caf\xc3\xa9>");
     EXPECT_EQ(resolver.lookups[0].params, "caf\xc3\xa9");
 }
-
-// PAR-020
 TEST(BracketReplacer, LongAdversarialInputCompletesInLinearTime)
 {
     RecordingResolver resolver;
@@ -355,8 +319,6 @@ TEST(BracketReplacer, ScanIsMonotonicAndLosesNoBytes)
         EXPECT_EQ(replacePlaceholders(input, resolver), input) << "input='" << input << "'";
     }
 }
-
-// PAR-021
 TEST(Contains, TrueWheneverAnOpeningBraceHasALaterClosingBrace)
 {
     EXPECT_TRUE(containsPlaceholders("{}"));
@@ -368,8 +330,6 @@ TEST(Contains, TrueWheneverAnOpeningBraceHasALaterClosingBrace)
     EXPECT_TRUE(containsPlaceholders("{{}}"));
     EXPECT_TRUE(containsPlaceholders("{no_close{a}"));
 }
-
-// PAR-022
 TEST(Contains, FalseWithoutABracePair)
 {
     EXPECT_FALSE(containsPlaceholders(""));

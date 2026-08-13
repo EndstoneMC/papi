@@ -58,7 +58,7 @@ void PapiBootstrap::stop()
         return;
     }
 
-    // Order matters (T-023 / A-007). The frozen lifecycle requires:
+    // The frozen lifecycle requires this order:
     //   1. Transition the service non-operational (Stopping) so nothing new can
     //      start and isActive returns false.
     //   2. Unregister the named service from the ServiceManager so shutdown

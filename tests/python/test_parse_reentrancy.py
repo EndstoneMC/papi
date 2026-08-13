@@ -1,4 +1,4 @@
-"""T-005 regression: unbounded parse reentrancy is bounded.
+"""Unbounded parse reentrancy is bounded.
 
 A provider callback that re-enters set_placeholders (directly or indirectly) would
 exhaust the C++ stack without the active-expansion cycle detector and the parse-depth

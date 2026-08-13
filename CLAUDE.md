@@ -436,8 +436,8 @@ develop, and the tag all point to the same commit.
 Java PlaceholderAPI is GPL. Endstone PAPI is MIT. Use the frozen Java tree only to
 confirm architecture, observable inputs/outputs, and edge cases. Never copy source,
 comments, private control flow, or mechanically translate methods. Implement
-independently from the specifications in the workdocs. If a workdoc requires
-clarification, study behavior and state the result in input/output/invariant terms.
+independently from the documented specifications. When clarification is required,
+study behavior and state the result in input/output/invariant terms.
 
 ## Deferred Features
 

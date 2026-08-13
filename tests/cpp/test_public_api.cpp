@@ -20,7 +20,7 @@
 // NOLINTBEGIN(bugprone-unchecked-optional-access)
 namespace {
 
-// REG-015: metadata copies must be plain values that outlive their expansion.
+// metadata copies must be plain values that outlive their expansion.
 static_assert(std::is_copy_constructible_v<papi::ExpansionInfo>);
 static_assert(std::is_move_constructible_v<papi::ExpansionInfo>);
 static_assert(std::is_copy_assignable_v<papi::ExpansionInfo>);
@@ -137,7 +137,7 @@ TEST(PlaceholderExpansion, PlayerQuitAndUnregisterDefaultToNoOps)
     EXPECT_NO_THROW(expansion.onUnregister(papi::UnregisterReason::Explicit));
 }
 
-// PAR-017: a null player is a supported input, not an error.
+// a null player is a supported input, not an error.
 TEST(PlaceholderExpansion, RequestAcceptsNullPlayer)
 {
     MinimalExpansion expansion;

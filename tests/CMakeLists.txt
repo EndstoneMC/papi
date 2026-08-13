@@ -50,7 +50,7 @@ target_link_libraries(papi_header_self_contained PRIVATE endstone_papi::endstone
 add_executable(papi_consumer_compile cpp/consumer_compile.cpp)
 target_link_libraries(papi_consumer_compile PRIVATE endstone_papi::endstone_papi)
 
-# T-009: External provider DSO fixture, built from public headers only.
+# External provider DSO fixture, built from public headers only.
 # Simulates a real C++ provider plugin linking against the installed SDK.
 add_library(papi_provider_fixture SHARED fixtures/provider/provider_demo.cpp)
 target_link_libraries(papi_provider_fixture PRIVATE endstone_papi::endstone_papi)
@@ -64,7 +64,7 @@ set_target_properties(papi_provider_fixture PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 
-# T-009: Test that loads the provider fixture DSO and validates the full
+# Test that loads the provider fixture DSO and validates the full
 # register -> request -> unregister/disable/shutdown -> unload lifecycle.
 add_executable(papi_provider_dso_test cpp/test_provider_dso.cpp)
 target_include_directories(papi_provider_dso_test PRIVATE
@@ -80,7 +80,7 @@ gtest_discover_tests(papi_provider_dso_test
         DISCOVERY_MODE PRE_TEST
         PROPERTIES TIMEOUT 120)
 
-# PR2-006: A distinct provider module constructs std::make_shared inside the
+# A distinct provider module constructs std::make_shared inside the
 # provider and passes it through PlaceholderAPI::registerExpansion. Unlike the
 # raw-factory fixture above, this deliberately tests the documented C++ ABI.
 add_library(papi_provider_shared_ptr_fixture SHARED

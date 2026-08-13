@@ -1,4 +1,4 @@
-// T-009: A separately built provider DSO that compiles against the installed
+// A separately built provider DSO that compiles against the installed
 // public headers only.  The test harness loads this module, calls the factory,
 // and drives the full register -> request -> unregister -> unload lifecycle.
 //

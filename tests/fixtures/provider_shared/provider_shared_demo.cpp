@@ -1,4 +1,4 @@
-// PR2-006: Provider-owned shared_ptr fixture built from public SDK headers only.
+// Provider-owned shared_ptr fixture built from public SDK headers only.
 
 #include <memory>
 #include <optional>

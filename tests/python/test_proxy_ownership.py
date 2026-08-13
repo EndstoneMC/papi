@@ -1,4 +1,4 @@
-"""T-003 regression: the GIL-safe proxy is ownership-only.
+"""The GIL-safe proxy is ownership-only.
 
 The proxy constructor must not read metadata from the wrapped Python expansion. Every
 metadata, capability, and preflight call must land behind the native core's canOperate

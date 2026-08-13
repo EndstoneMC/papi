@@ -1,4 +1,4 @@
-// Command and event ordering: EVT-001 through EVT-005.
+// Command and event ordering: .
 
 #include <stdexcept>
 
@@ -34,7 +34,7 @@ protected:
     FakePlugin owner_{"provider"};
 };
 
-// EVT-003: at dispatch time, a listener already sees the committed state and cannot
+// at dispatch time, a listener already sees the committed state and cannot
 // deadlock against the registry.
 TEST_F(EventsTest, RegisteredEventFiresAfterCommit)
 {
@@ -75,7 +75,7 @@ TEST_F(EventsTest, UnregisteredEventFiresAfterRemoval)
     EXPECT_TRUE(saw_unregistered);
 }
 
-// EVT-005: a throwing listener cannot prevent cleanup from finishing.
+// a throwing listener cannot prevent cleanup from finishing.
 TEST_F(EventsTest, ThrowingCleanupDoesNotPreventRemoval)
 {
     auto expansion = std::make_shared<FakeExpansion>("demo");
@@ -103,7 +103,7 @@ TEST_F(EventsTest, ThrowingCleanupDoesNotStopTheUnregisteredEvent)
     EXPECT_EQ(platform_->events[0].reason, papi::UnregisterReason::Explicit);
 }
 
-// T-012: an unknown C++ exception thrown by a listener during callEvent must not
+// an unknown C++ exception thrown by a listener during callEvent must not
 // escape into the caller. Both std::exception and non-std throws are contained.
 TEST_F(EventsTest, ThrowingListenerDoesNotEscapeFromRegisteredEvent)
 {
@@ -133,7 +133,7 @@ TEST_F(EventsTest, ThrowingListenerDoesNotEscapeFromUnregisteredEvent)
     EXPECT_TRUE(platform_->logger.anyContains("unknown C++ exception"));
 }
 
-// EVT-002: a failed registration emits no event.
+// a failed registration emits no event.
 TEST_F(EventsTest, FailedRegistrationEmitsNoEvent)
 {
     platform_->events.clear();
