@@ -6,6 +6,7 @@ import ast
 import hashlib
 import importlib
 import importlib.machinery
+import os
 import sys
 import types
 from pathlib import Path
@@ -63,7 +64,8 @@ def test_source_discovery_requires_one_exact_current_interpreter_payload(
 def test_shadow_root_is_exact_and_case_insensitive(local_package: tuple[Path, Path, Path]) -> None:
     root, package, _ = local_package
     assert loader.shadow_root(package) == root
-    assert loader.shadow_root(Path(str(package).upper())) == root
+    if os.name == "nt":
+        assert loader.shadow_root(Path(str(package).upper())) == root
     assert loader.shadow_root(package.parent) is None
 
 
@@ -113,7 +115,7 @@ def test_same_digest_reuses_persistent_module_and_alias(
         return native
 
     monkeypatch.setattr(loader, "_execute_extension", execute)
-    monkeypatch.setattr(loader.os, "name", "nt")
+    monkeypatch.setattr(loader, "os", types.SimpleNamespace(name="nt"))
 
     first = loader.load_native(package_module.__name__, package)
     second = loader.load_native(package_module.__name__, package)
@@ -147,7 +149,7 @@ def test_persistent_digest_mismatch_rejects_without_loading(
         return persistent
 
     monkeypatch.setattr(loader, "_execute_extension", execute)
-    monkeypatch.setattr(loader.os, "name", "nt")
+    monkeypatch.setattr(loader, "os", types.SimpleNamespace(name="nt"))
 
     with pytest.raises(ImportError, match="native binary changed while server runs.*restart server"):
         loader.load_native("test_loader_pkg", package)
@@ -231,7 +233,7 @@ def test_non_windows_path_keeps_direct_import_decision(
     monkeypatch: pytest.MonkeyPatch, local_package: tuple[Path, Path, Path]
 ) -> None:
     _, package, _ = local_package
-    monkeypatch.setattr(loader.os, "name", "posix")
+    monkeypatch.setattr(loader, "os", types.SimpleNamespace(name="posix"))
     assert not loader.should_use_shadow(package)
 
 
