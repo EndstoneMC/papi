@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "endstone-papi-pyexample"
-version = "0.0.1"
+version = "1.0.0"
 dependencies = ["endstone-papi"]
 authors = [
     { name = "Vincent", email = "magicdroidx@gmail.com" },

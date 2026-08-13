@@ -39,9 +39,9 @@ namespace papi {
  * parsing returns its input unchanged, queries return empty results, mutations
  * fail, and no method touches any plugin, server, or provider state.
  *
- * Parsing and registry mutation must happen on the server's primary thread,
- * because they call into provider code. containsPlaceholders and isActive are
- * pure and safe from any thread.
+ * Parsing and registry mutation require the server's primary thread, and provider
+ * callbacks execute there. containsPlaceholders, isActive, and registry queries
+ * that return copied state are safe from any thread.
  */
 class PlaceholderAPI : public endstone::Service {
 public:

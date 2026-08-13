@@ -7,8 +7,7 @@ consumer never needs to know which language a placeholder came from.
 
 ## Install
 
-- Download the `.whl` from [releases](https://github.com/EndstoneMC/papi/releases) or
-  [actions](https://github.com/EndstoneMC/papi/actions/workflows/build.yml)
+- Download the official `.whl` from [GitHub Releases](https://github.com/EndstoneMC/papi/releases)
 - Put it in the `plugins` folder
 - Restart the server
 
@@ -17,8 +16,8 @@ consumer never needs to know which language a placeholder came from.
 A placeholder is written `{identifier_params}`.
 
 The **first underscore** separates the identifier from the parameters. The identifier is
-matched case-insensitively; the parameters are passed to the expansion exactly as
-written, including case and spaces.
+ASCII-lowercased and matched case-insensitively; the parameters are passed to the
+expansion exactly as written, including case, spaces, and an empty value.
 
 | Input | Identifier | Params | Notes |
 |---|---|---|---|
@@ -28,12 +27,18 @@ written, including case and spaces.
 | `{player_}` | `player` | *(empty)* | dispatched with empty params |
 | `{player}` | — | — | no underscore, so it stays literal |
 
-Anything that cannot be resolved is left exactly as written: an unknown identifier, an
-expansion that declines, an expansion that fails, or malformed braces. Replacement text
-is never re-scanned, so a value that itself contains `{...}` is passed through verbatim.
+Anything that cannot be resolved is left exactly as written: malformed syntax, an unknown
+identifier, an expansion that returns no value, or an expansion exception. An empty
+string is a valid replacement. Replacement text is never re-scanned, so parsing is
+one-pass and nonrecursive.
 
 `{rel_identifier_params}` is a separate, relational form handled only by
-`set_relational_placeholders`, and only by expansions that declare relational support.
+`setRelationalPlaceholders` / `set_relational_placeholders`, and only by expansions that
+opt in to the relational callback.
+
+Identifiers must match `[A-Za-z0-9][A-Za-z0-9.-]*`. Registration is case-insensitive,
+so identifiers that differ only by case collide. Underscore and colon are invalid in an
+identifier.
 
 ## The core provides no placeholders
 
@@ -114,64 +119,50 @@ For the full code, see the [Python example plugin](examples/python).
 ### Lifecycle
 
 PAPI owns a registered expansion until it is unregistered, so a provider does not have
-to keep its own reference. Expansions are removed automatically when their owning plugin
-is disabled, or when a plugin they declared as `required_plugin` is disabled. Calling
-`unregister_expansions(self)` from `on_disable` is allowed and simply makes that
-explicit.
+to keep its own reference. Only the owner can explicitly unregister its expansions.
+PAPI also removes expansions when their owner or required plugin is disabled; calling
+`unregister_expansions(self)` from `on_disable` is allowed and simply makes that explicit.
 
-Parsing and registration must happen on the server thread, because they call into
-provider code. A retained service reference stays safe after PAPI is disabled: it
-becomes inert, so `active` turns False, parsing returns its input unchanged, and queries
-come back empty.
+A retained service reference stays safe after PAPI is disabled: it becomes permanently
+inert, so `active` turns False, parsing returns its input unchanged, queries come back
+empty, and mutations fail. After a reload, the old reference remains inert; consumers
+must load a fresh service.
+
+### Threading and introspection
+
+Parsing and register/unregister mutations require the primary server thread, and provider
+callbacks execute there. `containsPlaceholders` / `contains_placeholders`, `isActive` /
+`active`, and copied registration metadata queries may be called from any thread. The
+introspection APIs are `isRegistered`, `getRegisteredIdentifiers`, and `getExpansions` in
+C++, and `is_registered`, `registered_identifiers`, and `expansions` in Python. The
+ordinary placeholder player may be null / `None`.
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `/papi parse [target] <text>` | Parse text; target may be a player name, `me`, or `--null` |
+| `/papi parse <text>` | Parse text using the sender when it is a player; otherwise use a null player |
+| `/papi parse <target> <text>` | Parse text for a player name, `me`, or `--null` target |
 | `/papi list` | List every registered identifier |
 | `/papi info <identifier>` | Show one expansion's metadata |
 
-All require the `papi.command.papi` permission, which defaults to operators.
+All require the `papi.command.papi` permission, which defaults to operators. `me` is
+valid only for a player sender; invalid player names are rejected. Text may contain
+spaces, and selectors are not supported.
 
-## Migrating from 0.0.1
-
-This release is a rewrite; 0.0.1 plugins need changes.
-
-| 0.0.1 | Now |
-|---|---|
-| `{identifier\|params}` | `{identifier_params}` |
-| built-in placeholders (`{x}`, `{ping}`, `{date}`, …) | provide them from your own expansion |
-| `PlaceholderAPI(plugin)` in Python | `PlaceholderAPI.load(server.service_manager)` |
-| subclassing `PlaceholderAPI` | subclass `PlaceholderExpansion` instead |
-| `register_placeholder(plugin, id, processor)` | `register_expansion(plugin, expansion)` |
-| duplicate id became `plugin:identifier` | duplicate registration fails |
-| `setPlaceholders(Player*, text)` | `setPlaceholders(OfflinePlayer*, text)`, which accepts null |
-
-The transitional 0.0.1 compatibility adapters are not part of 0.1.0. In C++,
-`PlaceholderAPI::Processor`, `registerPlaceholder`, and `getPlaceholderPattern` were
-removed; implement `PlaceholderExpansion` and call `registerExpansion`. In Python,
-`register_placeholder` and `placeholder_pattern` were removed; subclass
-`PlaceholderExpansion` and call `register_expansion`. Use `containsPlaceholders` /
-`contains_placeholders` when a lexical placeholder check is needed; the parser does not
-expose or use a regex pattern.
-
-Identifiers are now validated: they must match `[A-Za-z0-9][A-Za-z0-9.-]*`. Underscore
-is the parameter separator and colon belonged to the removed duplicate-namespace
-behavior, so neither is allowed in an identifier.
-
-## Requirement
+## Requirements
 
 Python: 3.10+
 
-Endstone: 0.11.8 (API 0.11)
+Endstone: `>=0.11.8,<0.12` (API 0.11)
+
+Supported packages: x86-64 Windows and Linux.
 
 ## Building from source
 
-Requires CMake 3.29+, Ninja, Conan 2, and the Endstone toolchain: `clang-cl` on
-Windows (from an x64 MSVC developer environment) or Clang 20 with libc++ on Linux.
-Local Windows builds may use newer clang-cl releases; CI and release artifacts remain
-pinned to Clang 20 for reproducibility.
+Requires CMake 3.29+, Ninja, Conan 2.30.0, and the Endstone toolchain: clang-cl 20
+with an x64 MSVC developer environment and Windows SDK on Windows, or Clang 20 with
+libc++ and libc++abi on Linux.
 
 ```shell
 python -m pip install "conan==2.30.0"
@@ -180,6 +171,7 @@ cmake --preset papi-dev
 cmake --build --preset papi-dev
 ctest --preset papi-dev --output-on-failure
 python -m pytest -q
+python -m pip install build
 python -m build --wheel
 ```
 

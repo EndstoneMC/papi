@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux wheels now advertise Endstone's `manylinux_2_31` baseline and fail packaging when their ELF requirements exceed it.
 - `/papi` subcommands now use explicit command enum names, preventing duplicate enum registration while preserving both
   parse forms and multi-word text.
+- Python consumers can now load a correctly typed `PlaceholderAPI` from
+  Endstone's service manager without relying on unavailable cross-module RTTI
+  downcasting or trusting an arbitrary provider with the same service name.
+- Linux wheels establish their Endstone-owned C++ runtime-family dependency with
+  standard-SONAME bridge DSOs, avoiding direct hashed-SONAME loader crashes and
+  import-time mutation of the installed package directory.
+- `endstone>=0.11.8,<0.12` is now declared as a runtime dependency, so
+  `pip install endstone-papi` resolves the required Endstone C++ runtime
+  automatically.
 
 ### Added
 
@@ -46,19 +55,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: 0.0.1 compatibility adapters `PlaceholderAPI::Processor`,
   `registerPlaceholder`, `getPlaceholderPattern`, Python `register_placeholder`,
   and `placeholder_pattern`
-
-### Fixed
-
-- Python consumers can now load a correctly typed `PlaceholderAPI` from
-  Endstone's service manager without relying on unavailable cross-module RTTI
-  downcasting or trusting an arbitrary provider with the same service name.
-- Linux wheels now establish their Endstone-owned C++ runtime-family dependency
-  with build-time standard-SONAME bridge DSOs, avoiding both import-time package
-  mutation and direct hashed-SONAME loader crashes.
-
-- Linux manylinux wheels no longer mutate the installed package directory at
-  import time; standard-SONAME bridge DSOs resolve libc++, libc++abi, and libunwind
-  to Endstone's hashed runtime providers without bundling a competing runtime family.
-- `endstone>=0.11.8,<0.12` is now declared as a runtime dependency, so
-  `pip install endstone-papi` resolves the required Endstone C++ runtime
-  automatically

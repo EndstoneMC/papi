@@ -138,8 +138,9 @@ class PlaceholderAPI(Service):
     ``active`` turns False, parsing returns its input unchanged, queries come back
     empty, and mutations fail.
 
-    Parsing and registration must happen on the server thread, because they call into
-    provider code.
+    Parsing and register/unregister mutations require the primary server thread, and
+    provider callbacks execute there. ``contains_placeholders``, ``active``, and registry
+    queries that return copied state are safe from any thread.
     """
 
     @staticmethod
