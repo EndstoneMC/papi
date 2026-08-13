@@ -77,10 +77,11 @@ def test_pyproject_linux_before_build_installs_endstone() -> None:
     assert "pip install ninja wheel endstone" in content, "before-build must install wheel for unpacking and repacking"
 
 
-def test_pyproject_repair_wheel_uses_custom_script() -> None:
-    """repair-wheel-command must use tools/repair_wheel.py, not bare auditwheel."""
+def test_pyproject_routes_wheel_repair_through_build_backend() -> None:
+    """The PEP 517 backend must own repair for direct and sdist wheel builds."""
     content = _PYPROJECT.read_text(encoding="utf-8")
-    assert "tools/repair_wheel.py" in content, "repair-wheel-command must use the custom script"
+    assert 'build-backend = "papi_build_backend"' in content
+    assert 'repair-wheel-command = ""' in content
 
 
 def test_repair_wheel_script_exists() -> None:
