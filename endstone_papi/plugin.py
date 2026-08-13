@@ -21,9 +21,10 @@ class PlaceholderAPIPlugin(Plugin):
         "papi": {
             "description": "PlaceholderAPI command",
             "usages": [
-                "/papi parse <arguments: message>",
-                "/papi list",
-                "/papi info <identifier: string>",
+                "/papi (parse)<subcommand: PapiParseText> <text: message>",
+                "/papi (parse)<subcommand: PapiParseTarget> <target: string> <text: message>",
+                "/papi (list)<subcommand: PapiList>",
+                "/papi (info)<subcommand: PapiInfo> <identifier: string>",
             ],
             "permissions": ["papi.command.papi"],
         }

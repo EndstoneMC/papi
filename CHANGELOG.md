@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Linux wheels now advertise Endstone's `manylinux_2_31` baseline and fail packaging when their ELF requirements exceed it.
+- `/papi` subcommands now use explicit command enum names, preventing duplicate enum registration while preserving both
+  parse forms and multi-word text.
 
 ### Added
 

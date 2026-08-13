@@ -67,15 +67,15 @@ def test_command_and_permission_metadata_is_declared() -> None:
 
     papi = commands["papi"]
     assert papi["permissions"] == ["papi.command.papi"]
-    # Every subcommand the handler implements is documented in the usages.
-    usages = " ".join(papi["usages"])
-    assert "parse" in usages
-    assert sum(" parse " in f" {usage} " for usage in papi["usages"]) == 1
-    assert "list" in usages
-    assert "info" in usages
+    assert papi["usages"] == [
+        "/papi (parse)<subcommand: PapiParseText> <text: message>",
+        "/papi (parse)<subcommand: PapiParseTarget> <target: string> <text: message>",
+        "/papi (list)<subcommand: PapiList>",
+        "/papi (info)<subcommand: PapiInfo> <identifier: string>",
+    ]
 
     # There is deliberately no reload command.
-    assert "reload" not in usages
+    assert all("reload" not in usage for usage in papi["usages"])
 
     permissions = PlaceholderAPIPlugin.permissions
     assert permissions["papi.command.papi"]["default"] == "op"
@@ -113,14 +113,22 @@ def test_info_without_identifier_reports_usage() -> None:
     assert any("Usage" in error for error in sender.errors)
 
 
-def test_extra_parse_arguments_are_joined_into_the_text() -> None:
+def test_parse_target_preserves_a_multi_word_message_argument() -> None:
     service = StubService()
     plugin = make_plugin(service)
     sender = RecordingSender()
 
-    # A message argument arrives already split, so the handler must rejoin it rather
-    # than indexing a fixed position.
-    assert plugin.on_command(sender, None, ["parse", "--null", "hello", "{a_b}", "world"]) is True
+    assert plugin.on_command(sender, None, ["parse", "--null", "hello {a_b} world"]) is True
+    assert service.parsed == [(None, "hello {a_b} world")]
+    assert sender.messages == ["parsed:hello {a_b} world"]
+
+
+def test_parse_without_target_preserves_a_multi_word_message_argument() -> None:
+    service = StubService()
+    plugin = make_plugin(service)
+    sender = RecordingSender()
+
+    assert plugin.on_command(sender, None, ["parse", "hello {a_b} world"]) is True
     assert service.parsed == [(None, "hello {a_b} world")]
     assert sender.messages == ["parsed:hello {a_b} world"]
 
