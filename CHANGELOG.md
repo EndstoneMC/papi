@@ -55,9 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mutation and direct hashed-SONAME loader crashes.
 
 - Linux manylinux wheels no longer mutate the installed package directory at
-  import time; libc++ SONAME resolution is established at build time via
-  `patchelf --replace-needed`, so installation on read-only or relocated
-  site-packages works without silent fallback
+  import time; standard-SONAME bridge DSOs resolve libc++, libc++abi, and libunwind
+  to Endstone's hashed runtime providers without bundling a competing runtime family.
 - `endstone>=0.11.8,<0.12` is now declared as a runtime dependency, so
   `pip install endstone-papi` resolves the required Endstone C++ runtime
   automatically

@@ -6,8 +6,7 @@ providers: both implement the same expansion contract and share one registry, so
 consumer never needs to know which language a placeholder came from.
 
 > [!NOTE]
-> This plugin is under development and has not been released to PyPI. Builds are
-> available from
+> The 0.1.0 rewrite is under development. Candidate builds are available from
 > [GitHub Actions](https://github.com/EndstoneMC/papi/actions/workflows/build.yml).
 
 ## Install
@@ -174,7 +173,9 @@ Endstone: 0.11.8 (API 0.11)
 ## Building from source
 
 Requires CMake 3.29+, Ninja, Conan 2, and the Endstone toolchain: `clang-cl` on
-Windows (from an x64 MSVC developer environment) or Clang with libc++ on Linux.
+Windows (from an x64 MSVC developer environment) or Clang 20 with libc++ on Linux.
+Local Windows builds may use newer clang-cl releases; CI and release artifacts remain
+pinned to Clang 20 for reproducibility.
 
 ```shell
 python -m pip install "conan==2.30.0"
