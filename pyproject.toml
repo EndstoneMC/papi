@@ -1,7 +1,5 @@
 [build-system]
-# ABI-sensitive build dependencies are pinned for reproducibility. Keep the PEP 517
-# pybind11 package in lock-step with the Conan-resolved pybind11/3.0.1 CMake headers,
-# and update the CI Conan pin together with this declaration.
+# Keep the PEP 517 and Conan pybind11 versions in lock-step.
 requires = [
     "scikit-build-core-conan==0.9.2",
     "conan==2.30.0",
@@ -39,11 +37,7 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
 ]
-# PAPI's native extension links against the same libc++/libc++abi that Endstone
-# bundles (Linux) and exchanges C++ objects across the Endstone ABI boundary
-# (both platforms). The Linux wheel preserves standard libc++ NEEDED entries and
-# ships bridge DSOs that depend on Endstone's hashed SONAMEs, so a compatible
-# Endstone runtime must be present at install time.
+# PAPI and Endstone share an ABI-sensitive native runtime.
 dependencies = ["endstone>=0.11.8,<0.12"]
 
 [project.urls]
@@ -81,13 +75,8 @@ testpaths = ["tests/python"]
 [tool.ruff]
 line-length = 120
 lint.extend-select = ["I", "E", "F"]
-# Endstone plugins describe commands and permissions as mutable class attributes; this
-# is the documented convention, so the lint rule that would otherwise flag them is
-# turned off for the plugin file alone.
+# Endstone requires mutable command and permission metadata.
 lint.per-file-ignores = { "endstone_papi/plugin.py" = ["RUF012"] }
-# The historical examples are replaced by the native core. They are excluded until the
-# phase that rewrites them, so lint failures in code slated for deletion do not mask
-# real problems.
 extend-exclude = [
     "examples/python",
 ]
@@ -99,14 +88,9 @@ skip = ["*-musllinux*", "*_i686", "*-win32"]
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "ghcr.io/endstonemc/manylinux_2_31_x86_64"
 environment = { CC = "/usr/bin/clang-20", CXX = "/usr/bin/clang++-20" }
-# Install Endstone before building so that tools/repair_wheel.py can discover
-# the exact hashed SONAMEs in endstone.libs/ and build standard-SONAME bridge
-# DSOs that forward to them. The runtime dependency is also declared in
-# [project].dependencies, but we pin the exact build version for reproducibility.
+# Wheel repair requires Endstone's exact hashed runtime SONAMEs.
 before-build = "pip install ninja wheel endstone==0.11.8"
-# Every Linux build is repaired by papi_build_backend, including wheels rebuilt
-# from the sdist. The backend excludes libc++/libc++abi from bundling and creates
-# the standard-SONAME bridges through tools/repair_wheel.py.
+# The backend repairs wheels built directly or from an sdist.
 repair-wheel-command = ""
 before-all = [
     "apt-get update -y -q && apt-get install -y -q build-essential lsb-release wget software-properties-common gnupg python3-pip xz-utils",

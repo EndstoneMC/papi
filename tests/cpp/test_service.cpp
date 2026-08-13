@@ -620,7 +620,6 @@ TEST_F(ServiceTest, ProviderIsDestroyedBeforeItsModuleCouldUnload)
     EXPECT_EQ(destroyed, 1);
 }
 
-// The historical pipe syntax is gone rather than dual-parsed.
 TEST_F(ServiceTest, PipeSyntaxIsNoLongerRecognized)
 {
     auto expansion = add("player", owner_);

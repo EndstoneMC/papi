@@ -106,23 +106,83 @@ python -m build --sdist
 
 ## Code Style
 
-### C++
+### C++ (clang-format + clang-tidy)
 
-- Follow the `.clang-format` file (Microsoft base, Stroustrup braces, include
-  regrouping). Formatting is mechanically enforced; never hand-format.
-- C++20, extensions off.
-- Use `[[nodiscard]]` on query methods that return values the caller should not
-  discard.
-- Keep hot paths bounded and allocation-free where the surrounding design requires it.
-- Keep comments terse and explain only non-obvious constraints.
-- Do not leave development-process notes or comments that merely restate code.
+- Follow the repository `.clang-format` and `.clang-tidy` configuration.
+- The formatting style is based on Microsoft style with Stroustrup braces.
+- Naming conventions:
+  - Classes, structs, and enums: `CamelCase`.
+  - Methods: `camelBack`.
+  - Private and protected members: `lower_case_`.
+  - Local variables and parameters: `lower_case`.
+  - Macros: `UPPER_CASE`.
+- Formatting is mechanically enforced; do not hand-format around the formatter.
+- Use C++20 with extensions disabled.
+- Use `[[nodiscard]]` where ignoring a returned query or result would likely be a
+  caller mistake.
 
-### Python
+### Python (ruff)
 
-- Use `ruff` for formatting and linting (`line-length = 120`).
-- Use snake_case for methods and properties, matching the Endstone Python convention.
-- Class attributes for plugin metadata (`api_version`, `commands`, `permissions`) follow
-  the Endstone plugin convention and are exempt from `RUF012`.
+- Follow the repository Ruff configuration.
+- The line length is 120 characters.
+- Enabled rule families include:
+  - `I` — isort.
+  - `F` — pyflakes.
+- Use `snake_case` for methods, functions, variables, and properties unless an
+  external framework API requires otherwise.
+- Preserve Endstone plugin metadata conventions where applicable.
+
+### Comments (all languages)
+
+- Keep comments terse and human. Default to no comment.
+- For internal implementation code, when a comment is genuinely warranted, prefer
+  one short line describing only a non-obvious constraint.
+- Do not write multi-line explanations, rationale, design-decision narration,
+  historical background, or parenthetical asides in implementation code.
+- Do not leave "LLM notes": no comments explaining why a change was made, referring
+  to the development, audit, or review process, or restating what the code plainly
+  does.
+- Do not translate obvious code into prose.
+- Match the comment density and verbosity of the surrounding or original code. A
+  port should remain as terse as its upstream unless a local contract genuinely
+  differs.
+- Comments should describe stable code constraints, not the history of how the
+  implementation arrived there.
+
+### Public API documentation
+
+Public API documentation is a deliberate exception to the implementation-comment
+brevity rule.
+
+Project-owned public APIs should have concise documentation when callers need
+information that cannot be inferred safely from the signature alone.
+
+Document caller-visible contract only, including where relevant:
+
+- Purpose and observable semantics.
+- Parameter meaning.
+- `nullptr` / `None` behavior.
+- Return-value and failure semantics.
+- Ownership and lifetime.
+- Thread-affinity and thread-safety requirements.
+- Callback or event behavior.
+- Mutation and state preconditions.
+- Guarantees callers may rely on.
+
+Do not document:
+
+- Private implementation details.
+- Internal data structures.
+- Historical reasons for a change.
+- Review, audit, or remediation history.
+- Obvious facts already expressed by the signature.
+
+Public API documentation may use short multi-line Doxygen comments or docstrings only
+when necessary to express the public contract clearly. Keep it concise; do not turn
+API comments into design documents.
+
+General rule: internal comments explain only a necessary non-obvious constraint.
+Public API documentation explains only what callers may rely on.
 
 ### Include conventions
 

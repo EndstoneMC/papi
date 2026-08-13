@@ -48,9 +48,7 @@ std::string replacePlaceholders(const std::string_view text, PlaceholderResolver
             result.append(token);
         }
 
-        // Always resume after the candidate's closing brace. A replacement is
-        // therefore never rescanned, and an unresolved candidate is not retried from
-        // a later opening brace inside it.
+        // Replacement text is never rescanned.
         pos = close + 1;
     }
 
@@ -60,8 +58,6 @@ std::string replacePlaceholders(const std::string_view text, PlaceholderResolver
 bool containsPlaceholders(const std::string_view text) noexcept
 {
     const auto open = text.find('{');
-    // Any later opening brace's closing brace would also follow the first one, so
-    // checking the first is sufficient.
     return open != std::string_view::npos && text.find('}', open + 1) != std::string_view::npos;
 }
 

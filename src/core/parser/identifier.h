@@ -10,9 +10,8 @@ namespace papi::detail {
  *
  * The grammar is a full match of <code>[A-Za-z0-9][A-Za-z0-9.-]*</code>.
  *
- * Underscore is excluded because it separates identifier from parameters, colon
- * because it was the historical duplicate-namespace separator, and braces,
- * percent, and whitespace because they interact with placeholder syntax.
+ * Underscore, colon, braces, percent, and whitespace are excluded because they
+ * interact with placeholder syntax.
  * Everything is compared as raw ASCII bytes, so behavior does not vary with the
  * process locale.
  */

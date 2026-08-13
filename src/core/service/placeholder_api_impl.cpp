@@ -170,9 +170,7 @@ public:
         const auto generation = lease.getEntry()->getGeneration();
         const ActiveExpansionGuard cycle_guard{&service_, generation};
         if (cycle_guard.reEntered()) {
-            // This expansion is already being resolved higher on the call stack:
-            // a provider callback re-entered parsing and reached itself, directly
-            // or through another expansion. Preserve the original token.
+            // Preserve the token when provider dispatch cycles.
             service_.logReentrancyError(lease.getEntry()->getInfo(), generation, "cycle detected");
             return std::nullopt;
         }
@@ -184,8 +182,7 @@ public:
             return std::nullopt;
         }
 
-        // If the provider unregistered itself during the call its answer no longer
-        // reflects a registered expansion, so the original token is kept instead.
+        // Discard results from entries retired during their callback.
         if (!lease.isStillActive()) {
             return std::nullopt;
         }
@@ -212,8 +209,7 @@ public:
     [[nodiscard]] std::optional<std::string> resolve(const std::string_view canonical_identifier,
                                                      const std::string_view params) override
     {
-        // The relational form carries a mandatory rel_ prefix, which the caller has
-        // not stripped yet because the scanner splits on the first underscore only.
+        // Strip the relational prefix before ordinary identifier parsing.
         constexpr std::string_view prefix = "rel";
         if (canonical_identifier != prefix) {
             return std::nullopt;
@@ -235,8 +231,6 @@ public:
             return std::nullopt;
         }
         const auto &entry = lease.getEntry();
-        // Capability is a copied flag, never probed with a cast across the plugin
-        // boundary.
         if (!entry->supportsRelationalPlaceholders()) {
             return std::nullopt;
         }
@@ -279,8 +273,7 @@ PlaceholderApiImpl::PlaceholderApiImpl(std::shared_ptr<Platform> platform, std::
 
 PlaceholderApiImpl::~PlaceholderApiImpl()  // NOLINT(bugprone-exception-escape)
 {
-    // A correctly managed service is already shut down by its plugin. This is only a
-    // backstop for a service that is destroyed without one.
+    // Backstop for destruction outside normal plugin shutdown.
     shutdown();
 }
 
@@ -303,8 +296,7 @@ bool PlaceholderApiImpl::canOperate(const ErrorOperation operation, const std::s
         return true;
     }
 
-    // Off-thread use is a caller bug. Report it, but bounded: a parse loop on a
-    // worker thread would otherwise flood the console.
+    // Off-thread diagnostics must remain bounded.
     const auto decision = throttle_.record(ServiceErrorScope, operation);
     if (decision.should_log) {
         std::string message =
@@ -325,8 +317,7 @@ std::string PlaceholderApiImpl::setPlaceholders(const endstone::OfflinePlayer *p
     }
     const ParseDepthGuard depth_guard;
     if (ParseDepthGuard::budgetExceeded()) {
-        // A provider callback re-entered parsing too deeply. Preserve the input
-        // rather than risking stack exhaustion.
+        // Preserve the input when nested parsing exceeds its budget.
         logReentrancyError({}, 0, "parse depth budget exceeded");
         return std::string(text);
     }
@@ -351,8 +342,6 @@ std::string PlaceholderApiImpl::setRelationalPlaceholders(const endstone::Player
 
 bool PlaceholderApiImpl::containsPlaceholders(const std::string_view text) const noexcept
 {
-    // Purely lexical, so it needs neither the registry nor the platform and stays
-    // meaningful even on a retained inert service.
     return detail::containsPlaceholders(text);
 }
 
@@ -430,8 +419,7 @@ void PlaceholderApiImpl::handlePluginDisabled(endstone::Plugin &plugin)
         return;
     }
 
-    // The plugin's enabled flag is already false by the time this event arrives, so
-    // removal must not be gated on the owner still being enabled.
+    // Disable cleanup runs after the owner's enabled flag is cleared.
     auto removed = manager_.detachForDisabledPlugin(plugin, plugin.getName());
     for (auto &entry : removed) {
         finishRemoval(entry);
@@ -467,18 +455,7 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
     const auto generation = entry->getGeneration();
     const auto info = entry->getInfo();
 
-    // The unregister event is dispatched as the last step of cleanup so it always
-    // fires after onUnregister and provider release, even when cleanup is deferred
-    // by an active call lease. PapiShutdown suppresses it because the event system
-    // is itself being torn down.
-    //
-    // The body is wrapped in a catch-all because the lambda may run deferred from
-    // CallLease::~CallLease() (noexcept).  invokeProvider and dispatchLifecycleEvent
-    // already contain provider/listener exceptions; this is the last-resort guard
-    // against residual bad_alloc-class failures from logging or event construction.
-    // clang-tidy cannot prove catch(...) makes the lambda noexcept, and the empty
-    // catch is intentional (logging here could re-throw), so both checks are
-    // suppressed.
+    // Cleanup may run from a noexcept call-lease destructor.
     // NOLINTNEXTLINE(bugprone-exception-escape)
     auto cleanup = [this, entry, reason, generation, info] {
         try {
@@ -489,13 +466,10 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
                 }
             }
 
-            // Release the provider object here, while the module and interpreter that
-            // own its code are still loaded.
+            // Providers must be released before their modules unload.
             auto released = entry->releaseExpansion();
             released.reset();
 
-            // owner_ was already cleared atomically at retirement, so no stale
-            // plugin identity survives the deferred-cleanup window.
             throttle_.forget(generation);
 
             if (reason != UnregisterReason::PapiShutdown) {
@@ -505,14 +479,13 @@ void PlaceholderApiImpl::finishRemoval(RemovedEntry &removed)
         }
         // NOLINTNEXTLINE(bugprone-empty-catch)
         catch (...) {
-            // Intentionally swallowed -- see comment above.
+            // A deferred cleanup must not escape a noexcept destructor.
         }
     };
 
     if (entry->requestCleanup(cleanup)) {
         cleanup();
     }
-    // Otherwise a callback is still running and the last call lease runs it.
 }
 
 void PlaceholderApiImpl::logProviderError(const ExpansionInfo &info, const std::uint64_t generation,
@@ -585,31 +558,23 @@ void PlaceholderApiImpl::dispatchLifecycleEvent(endstone::Event &event) const
 
 bool PlaceholderApiImpl::beginShutdown()
 {
-    // Only the caller that wins this transition marks the service Stopping.  The
-    // registry is not drained here -- the bootstrap unregisters the named service
-    // from the ServiceManager between beginShutdown and finishShutdown so shutdown
-    // callbacks cannot rediscover PAPI as a still-published service.
+    // Registry draining waits until the service is withdrawn.
     auto expected = ServiceState::Active;
     return state_.compare_exchange_strong(expected, ServiceState::Stopping, std::memory_order_acq_rel);
 }
 
 void PlaceholderApiImpl::finishShutdown()
 {
-    // Only the Stopping state performs teardown.  Active has not begun shutdown,
-    // and Inactive has already completed it.
     if (state_.load(std::memory_order_acquire) != ServiceState::Stopping) {
         return;
     }
 
-    // From here parsing returns input unchanged and mutations refuse, so nothing new
-    // can enter the registry while it is being emptied.
     auto removed = manager_.detachAll(UnregisterReason::PapiShutdown);
     for (auto &entry : removed) {
         finishRemoval(entry);
     }
 
-    // Deliberately no unregister events: listeners and the event system are being
-    // torn down at the same time, so firing them would be unpredictable.
+    // Shutdown suppresses unregister events while listeners are being torn down.
     throttle_.clear();
     state_.store(ServiceState::Inactive, std::memory_order_release);
 }

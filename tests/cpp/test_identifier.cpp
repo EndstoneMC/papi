@@ -51,7 +51,6 @@ TEST(Identifier, RejectsDelimitersAndNamespaceSeparators)
     EXPECT_FALSE(isValidIdentifier("demo}"));
     EXPECT_FALSE(isValidIdentifier("{demo}"));
     EXPECT_FALSE(isValidIdentifier("%demo%"));
-    // Colon was the historical duplicate-namespace separator and is now invalid.
     EXPECT_FALSE(isValidIdentifier("plugin:demo"));
 }
 

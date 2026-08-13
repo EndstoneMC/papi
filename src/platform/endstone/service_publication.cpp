@@ -13,9 +13,7 @@ struct PublicationState {
 
 PublicationState &publicationState()
 {
-    // Python may destroy late bootstrap state while the extension module is tearing
-    // down. Process-lifetime storage avoids cross-translation-unit destruction
-    // order; normal stop() still removes every publication.
+    // Process-lifetime storage avoids extension teardown ordering hazards.
     static auto *state = new PublicationState;
     return *state;
 }

@@ -9,13 +9,7 @@
 namespace papi::detail {
 namespace {
 
-/**
- * @brief Runs a provider callback and reports whether it completed.
- *
- * Provider code is third-party and may throw anything, including exceptions that
- * do not derive from std::exception. Nothing may escape into Endstone, so both are
- * contained here and reported as a plain failure.
- */
+// Contains every C++ exception at the provider boundary.
 template <typename Fn>
 [[nodiscard]] bool invokeProvider(Fn &&fn, std::string &error_message)
 {
@@ -98,10 +92,7 @@ bool ExpansionEntry::retire() noexcept
         return false;
     }
     active_ = false;
-    // Clear the raw owner identity as part of the atomic retirement transition so
-    // a retired entry can never retain a stale plugin pointer -- even while a
-    // deferred cleanup waits for an in-flight call lease to exit.  The copied
-    // ExpansionInfo.owner string remains available for diagnostics and events.
+    // Retired entries must not retain a plugin pointer while cleanup is deferred.
     owner_ = nullptr;
     return true;
 }
@@ -116,8 +107,7 @@ bool ExpansionEntry::requestCleanup(std::function<void()> cleanup)
         cleanup_done_ = true;
         return true;
     }
-    // A callback is running, which for a main-thread-only API means the provider is
-    // unregistering itself. Defer so cleanup and destruction cannot re-enter it.
+    // Self-unregistration defers cleanup until the active callback returns.
     deferred_cleanup_ = std::move(cleanup);
     return false;
 }
@@ -191,8 +181,7 @@ void CallLease::release()
         return;
     }
 
-    // Take ownership of any cleanup the provider deferred by unregistering itself
-    // during the call, then run it after the lock is dropped and the lease is gone.
+    // Deferred provider cleanup runs after the entry lock is released.
     std::function<void()> deferred;
     {
         std::scoped_lock lock(entry_->mutex_);
@@ -229,9 +218,7 @@ RegisterResult ExpansionManager::registerExpansion(endstone::Plugin &owner,
         return {false, RegisterError::OwnerNotEnabled, {}};
     }
 
-    // Provider metadata is queried once, outside the lock, and copied. Everything
-    // afterwards works from the copies so a misbehaving provider cannot change its
-    // identity after validation.
+    // Provider metadata is copied once outside the registry lock.
     ExpansionInfo info;
     bool supports_player_cleanup = false;
     std::string raw_identifier;
@@ -312,10 +299,7 @@ RegisterResult ExpansionManager::registerExpansion(endstone::Plugin &owner,
         return {false, RegisterError::PreflightRefused, {}};
     }
 
-    // Commit. Owner and dependency state are re-checked immediately before the lock
-    // rather than inside it: the plugin manager must never be called while the
-    // registry is locked, and because registration is confined to the server thread
-    // no other thread can change plugin state in between.
+    // Plugin state is checked immediately before locking; PluginManager calls must stay outside the lock.
     if (!platform_.isPluginEnabled(owner)) {
         return {false, RegisterError::OwnerNotEnabled, {}};
     }
@@ -405,8 +389,7 @@ std::vector<RemovedEntry> ExpansionManager::detachForDisabledPlugin(const endsto
             const auto info = entry->getInfo();
             const bool depends = info.required_plugin.has_value() && *info.required_plugin == plugin_name;
             if (owned || depends) {
-                // An entry that is both owned by and dependent on the plugin is
-                // removed once, attributed to its owner.
+                // Ownership takes precedence when both removal reasons apply.
                 detached.emplace_back(entry, owned ? UnregisterReason::OwnerDisabled
                                                    : UnregisterReason::RequiredPluginDisabled);
                 it = entries_.erase(it);

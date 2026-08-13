@@ -1,9 +1,4 @@
-"""Endstone plugin bootstrap for PlaceholderAPI.
-
-This module owns no framework behavior. The service object, registry, parser, and
-lifecycle all live in the native core; the plugin only creates the service, hands it
-to Endstone, and shuts it down again.
-"""
+"""Endstone plugin bootstrap for PlaceholderAPI."""
 
 from __future__ import annotations
 
@@ -46,9 +41,7 @@ class PlaceholderAPIPlugin(Plugin):
         self.logger.info("PlaceholderAPI is ready.")
 
     def on_disable(self) -> None:
-        # Native teardown must run here, while every provider module and the
-        # interpreter are still loaded. Leaving it to garbage collection would let
-        # expansions outlive the code that defines them.
+        # Providers must be released before their modules unload.
         self._bootstrap.stop()
 
     def on_command(self, sender: CommandSender, command: Command, args: list[str]) -> bool:

@@ -1,11 +1,4 @@
-// Validate the full external-provider DSO lifecycle.
-//
-// The provider fixture (tests/fixtures/provider/provider_demo.cpp) is a
-// separately linked shared library built against the installed public headers
-// only.  This test loads it, drives register -> request -> unregister ->
-// unload, and verifies that the expansion object is destroyed *before* the DSO
-// is unloaded.  If PAPI released the shared_ptr after dlclose/FreeLibrary, the
-// virtual destructor call would jump into unmapped memory.
+// External-provider DSO lifetime coverage.
 
 #ifdef _WIN32
 #include <windows.h>
@@ -101,10 +94,7 @@ protected:
         ASSERT_NE(last_reason_, nullptr);
     }
 
-    // Wraps the raw pointer from the DSO in a shared_ptr whose deleter calls
-    // back into the DSO, so destruction and deallocation stay on the fixture
-    // side of the boundary.  After registering, the caller must release its
-    // own reference so the service is the sole owner.
+    // Destruction and deallocation must remain inside the fixture DSO.
     std::shared_ptr<papi::PlaceholderExpansion> makeExpansion()
     {
         auto deleter = [this](papi::PlaceholderExpansion *p) {
@@ -124,11 +114,6 @@ protected:
     DemoLastReasonFn last_reason_ = nullptr;
 };
 
-// The fixture is built from the public headers only and returns a raw pointer
-// that crosses the DSO boundary.  Registration, virtual dispatch, and
-// unregister must all work without symbol-resolution or ABI failures.  The
-// expansion is destroyed when the service releases its reference -- before the
-// DSO is unloaded.
 TEST_F(ProviderDsoTest, FullLifecycleFromExternalModule)
 {
     {
@@ -138,20 +123,14 @@ TEST_F(ProviderDsoTest, FullLifecycleFromExternalModule)
         EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo_x}"), "value-x");
         EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo_hello}"), "value-hello");
     }
-    // The local reference is gone; the service is the sole owner.
-
     EXPECT_FALSE(is_destroyed_());
     EXPECT_TRUE(service_->unregisterExpansion(owner_, "demo"));
     EXPECT_TRUE(is_destroyed_());
     EXPECT_EQ(last_reason_(), UnregisterReason::Explicit);
 
-    // After unregister the placeholder is unresolved again.
     EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo_x}"), "{demo_x}");
 }
 
-// Owner disable must remove and destroy the expansion before the module is
-// unloaded -- the same guarantee that prevents UB when a real provider plugin
-// is unloaded by Endstone.
 TEST_F(ProviderDsoTest, OwnerDisableDestroysExpansionBeforeUnload)
 {
     {
@@ -166,8 +145,6 @@ TEST_F(ProviderDsoTest, OwnerDisableDestroysExpansionBeforeUnload)
     EXPECT_EQ(last_reason_(), UnregisterReason::OwnerDisabled);
 }
 
-// PAPI shutdown releases every expansion.  The expansion must be destroyed
-// while the DSO is still loaded so the virtual destructor is reachable.
 TEST_F(ProviderDsoTest, ShutdownDestroysExpansionBeforeUnload)
 {
     {
@@ -181,11 +158,6 @@ TEST_F(ProviderDsoTest, ShutdownDestroysExpansionBeforeUnload)
     EXPECT_EQ(last_reason_(), UnregisterReason::PapiShutdown);
 }
 
-// A retained shared_ptr<PlaceholderAPI> must remain inert after PAPI
-// shutdown even when the backing provider DSO is unloaded.  The service must
-// not call into the unloaded module -- no vtable dispatch, no callback, no
-// metadata read.  This is the binary-lifetime guarantee that makes a server
-// reload safe.
 TEST_F(ProviderDsoTest, RetainedServiceIsInertAfterProviderDsoUnload)
 {
     {
@@ -194,22 +166,16 @@ TEST_F(ProviderDsoTest, RetainedServiceIsInertAfterProviderDsoUnload)
         EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo_x}"), "value-x");
     }
 
-    // Retain the service before shutdown -- a consumer does this to survive a
-    // reload.
     auto retained = std::shared_ptr<papi::PlaceholderAPI>(service_);
     ASSERT_TRUE(retained->isActive());
 
     service_->shutdown();
     EXPECT_FALSE(retained->isActive());
 
-    // The expansion was destroyed during shutdown, before the DSO is unloaded.
     EXPECT_TRUE(is_destroyed_());
 
-    // Unload the provider fixture.  The retained service must not touch it.
     lib_.reset();
 
-    // Every method on the retained service must be inert: no crash, no call
-    // into the unloaded DSO, original token preserved.
     EXPECT_FALSE(retained->isActive());
     EXPECT_EQ(retained->setPlaceholders(nullptr, "{demo_x}"), "{demo_x}");
     EXPECT_TRUE(retained->getExpansions().empty());
@@ -217,7 +183,6 @@ TEST_F(ProviderDsoTest, RetainedServiceIsInertAfterProviderDsoUnload)
     EXPECT_FALSE(retained->isRegistered("demo"));
     EXPECT_TRUE(retained->containsPlaceholders("{demo_x}"));
 
-    // A fresh service works independently.
     auto fresh = std::make_shared<PlaceholderApiImpl>(platform_, papi_plugin_.getName());
     EXPECT_TRUE(fresh->isActive());
     EXPECT_EQ(fresh->setPlaceholders(nullptr, "{demo_x}"), "{demo_x}");

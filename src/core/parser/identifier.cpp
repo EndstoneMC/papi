@@ -27,8 +27,7 @@ bool isValidIdentifier(const std::string_view identifier) noexcept
         return false;
     }
 
-    // Use data()/size() instead of front()/substr() so the noexcept contract is
-    // provably satisfied -- substr is not noexcept (may throw out_of_range).
+    // substr would violate the noexcept contract.
     const char *const chars = identifier.data();
     const char first = chars[0];
     if (!isAsciiLetter(first) && !isAsciiDigit(first)) {

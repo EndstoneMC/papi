@@ -10,8 +10,7 @@ ServerPlatform::ServerPlatform(endstone::Server &server, endstone::Logger &logge
 
 bool ServerPlatform::isPrimaryThread() const
 {
-    // Detached means PAPI is gone; reporting false makes every gated operation refuse
-    // rather than reach a server that may no longer be there.
+    // Detached platforms must not reach the server.
     return server_ != nullptr && server_->isPrimaryThread();
 }
 

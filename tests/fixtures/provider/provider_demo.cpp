@@ -1,11 +1,4 @@
-// A separately built provider DSO that compiles against the installed
-// public headers only.  The test harness loads this module, calls the factory,
-// and drives the full register -> request -> unregister -> unload lifecycle.
-//
-// The factory returns a raw pointer and pairs with a destroy function so the
-// object's destructor and deallocation both execute inside this DSO.  This is
-// the C-ABI-safe pattern for crossing a DSO boundary without relying on a
-// shared C++ runtime's shared_ptr layout.
+// External provider fixture built against installed public headers only.
 
 #include <memory>
 #include <optional>
@@ -25,9 +18,7 @@
 
 namespace {
 
-// Module-static state that the test reads before unloading.  The expansion
-// writes to these in its destructor / onUnregister so the test can observe
-// lifecycle transitions without reaching back into the object after death.
+// State must be inspected before the fixture DSO unloads.
 bool g_destroyed = false;
 papi::UnregisterReason g_last_reason{};
 
@@ -52,7 +43,7 @@ public:
 
 }  // namespace
 
-// C-linkage factory functions use snake_case by C-ABI convention.
+// C ABI exports use snake_case.
 // NOLINTBEGIN(readability-identifier-naming)
 extern "C" {
 

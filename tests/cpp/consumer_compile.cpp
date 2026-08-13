@@ -1,6 +1,4 @@
-// A standalone third-party consumer. It sees only the public headers and the
-// Endstone API, exactly as a plugin built against the packaged wheel does. If this
-// stops compiling, the public contract has started leaking implementation detail.
+// Standalone consumer built only against public headers and Endstone.
 
 #include <memory>
 #include <optional>
@@ -79,7 +77,5 @@ private:
 
 int main()
 {
-    // Never run; the value of this target is that it links against the public
-    // contract alone.
     return static_cast<int>(sizeof(DemoPlugin) + sizeof(DemoExpansion));
 }

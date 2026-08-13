@@ -1,16 +1,6 @@
 #pragma once
 
-// A concrete endstone::Player for tests.
-//
-// PAPI hands provider callbacks borrowed Player references, so exercising relational
-// dispatch and player cleanup needs real objects with real identity. Casting some
-// other pointer to Player* would be undefined behavior, and on Windows the multiple
-// inheritance in Player makes such a cast produce a wrong vtable outright.
-//
-// Only getName and getUniqueId carry meaning; every other member is a stub that never
-// touches server state. The generated stubs mirror Endstone 0.11's Player hierarchy,
-// so a signature change upstream surfaces here as a compile error rather than as a
-// silently wrong test.
+// Concrete Player identity for relational and cleanup tests.
 
 #include <chrono>
 #include <cstdint>

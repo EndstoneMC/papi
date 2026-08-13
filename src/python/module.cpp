@@ -29,14 +29,7 @@ namespace py = pybind11;
 
 namespace {
 
-/**
- * @brief Registers an expansion supplied from Python.
- *
- * The provider is wrapped in a GIL-safe proxy before it reaches the registry, so every
- * later callback and the final release happen with the GIL held. A native expansion
- * passed in from Python is wrapped identically: the extra acquisition is cheap next to
- * getting the ownership rules wrong.
- */
+// Python-backed providers require GIL-safe callbacks and final release.
 bool registerExpansionFromPython(papi::PlaceholderAPI &service, endstone::Plugin &owner, const py::object &expansion)
 {
     auto *native = expansion.cast<papi::PlaceholderExpansion *>();
@@ -44,25 +37,15 @@ bool registerExpansionFromPython(papi::PlaceholderAPI &service, endstone::Plugin
         throw py::type_error("expansion must be a PlaceholderExpansion");
     }
 
-    // Ownership-only construction: the proxy stores the handle but reads no metadata,
-    // so every Python entry point lands behind the core's canOperate gate and
-    // invokeProvider containment.
     auto proxy = std::make_shared<papi::python::GilSafeExpansionProxy>(expansion, *native);
 
-    // Registration calls into the registry and may invoke the proxy, which reacquires
-    // the GIL as needed. The GIL is released here so a provider callback running on the
-    // server thread cannot deadlock against Python code on another thread.
+    // Provider callbacks reacquire the GIL through the proxy.
     const py::gil_scoped_release release;
     return service.registerExpansion(owner, std::move(proxy));
 }
 
 #ifdef PAPI_TEST_BINDINGS
-/**
- * @brief In-memory Platform for Python regression tests, mirroring FakePlatform.
- *
- * Reports the calling thread as primary and every plugin as enabled, records log
- * messages so tests can assert on reentrancy diagnostics, and no-ops event dispatch.
- */
+// In-memory platform for Python binding tests.
 class TestPlatform final : public papi::detail::Platform {
 public:
     [[nodiscard]] bool isPrimaryThread() const override { return true; }
@@ -84,9 +67,6 @@ public:
     std::vector<LogRecord> records;
 };
 
-/**
- * @brief Minimal endstone::Plugin identity for Python regression tests.
- */
 class TestPlugin final : public endstone::Plugin {
 public:
     explicit TestPlugin(std::string name) : description_(std::move(name), "1.0.0") {}
@@ -97,13 +77,7 @@ private:
     endstone::PluginDescription description_;
 };
 
-/**
- * @brief Owns a PlaceholderApiImpl backed by TestPlatform/TestPlugin.
- *
- * Lets Python regression tests exercise parse-reentrancy and cycle detection through
- * the same GilSafeExpansionProxy + trampoline path production uses, without a running
- * Bedrock server. Compiled out of release wheels.
- */
+// Native service fixture for Python binding tests.
 class TestService {
 public:
     explicit TestService(std::string name)
@@ -208,8 +182,7 @@ PYBIND11_MODULE(_papi, m)
                    self.owner + "')";
         });
 
-    // Subclassable from Python. smart_holder plus trampoline_self_life_support let the
-    // native registry hold the last reference to a Python-derived object safely.
+    // smart_holder preserves Python-derived providers held by the native registry.
     py::class_<papi::PlaceholderExpansion, papi::python::PyPlaceholderExpansion, py::smart_holder>(
         m, "PlaceholderExpansion",
         "Base class for placeholder providers. Subclass this and register it with the "
@@ -236,9 +209,7 @@ PYBIND11_MODULE(_papi, m)
         .def("on_unregister", &papi::PlaceholderExpansion::onUnregister, py::arg("reason"),
              "Called once after this expansion has been removed from the registry.");
 
-    // The service is native and final: Python consumes it but never implements it.
-    // py::is_final makes a Python subclass a TypeError rather than something that
-    // silently appears to work while bypassing the framework's lifecycle.
+    // Python consumes the native service but cannot subclass it.
     py::class_<papi::PlaceholderAPI, endstone::Service, std::shared_ptr<papi::PlaceholderAPI>>(
         m, "PlaceholderAPI", "Resolves placeholders through registered expansions.", py::is_final())
         .def_static(
@@ -282,8 +253,6 @@ PYBIND11_MODULE(_papi, m)
         .def_property_readonly("reason", &papi::ExpansionUnregisteredEvent::getReason,
                                "Why the expansion was removed.");
 
-    // Private bootstrap surface. Only the PAPI plugin uses it; it is deliberately not
-    // part of the documented API and grants no way to implement the service.
     py::class_<papi::detail::PapiBootstrap>(m, "_PapiBootstrap", "Internal native lifecycle state for the PAPI plugin.")
         .def(py::init<>())
         .def("start", &papi::detail::PapiBootstrap::start, py::arg("plugin"),
@@ -293,14 +262,7 @@ PYBIND11_MODULE(_papi, m)
                                "Internal: the published service, or None.");
 
 #ifdef PAPI_TEST_BINDINGS
-    // Test-only: lets Python regression tests construct the proxy directly so its
-    // ownership-only contract (no metadata reads in the constructor) can be verified
-    // without a running server. Compiled out of release wheels.
-    //
-    // The factory mirrors registerExpansionFromPython exactly: the native pointer is
-    // obtained via py::cast, not via the PlaceholderExpansion& type caster. Returns
-    // shared_ptr<PlaceholderExpansion> so pybind11 wraps it through the base class's
-    // smart_holder, avoiding a holder-type mismatch.
+    // Use the production cast and smart-holder path in proxy tests.
     m.def("_test_make_proxy", [](const py::object &expansion) -> std::shared_ptr<papi::PlaceholderExpansion> {
         auto *native = expansion.cast<papi::PlaceholderExpansion *>();
         if (native == nullptr) {
@@ -309,9 +271,6 @@ PYBIND11_MODULE(_papi, m)
         return std::make_shared<papi::python::GilSafeExpansionProxy>(expansion, *native);
     });
 
-    // Test-only: a service backed by an in-memory platform and plugin, so Python
-    // regression tests can exercise reentrancy and cycle detection through the real
-    // GilSafeExpansionProxy + trampoline dispatch path without a running server.
     py::class_<TestService>(m, "_TestService", "Test-only: PlaceholderAPI backed by an in-memory platform.")
         .def(py::init<std::string>(), py::arg("plugin_name"))
         .def_property_readonly("service", &TestService::service, "The native PlaceholderAPI service.")

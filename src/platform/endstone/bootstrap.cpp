@@ -38,9 +38,7 @@ bool PapiBootstrap::start(endstone::Plugin &plugin)
 
 void PapiBootstrap::registerListeners(endstone::Plugin &plugin)
 {
-    // Captured by value: the handlers must not resurrect a dead service, and a
-    // weak reference would be pointless because stop() runs before the plugin's
-    // Python object or module can be released.
+    // Listener ownership cannot outlive stop().
     auto service = service_;
 
     plugin.registerEvent<endstone::PluginDisableEvent>(
@@ -58,22 +56,13 @@ void PapiBootstrap::stop()
         return;
     }
 
-    // The frozen lifecycle requires this order:
-    //   1. Transition the service non-operational (Stopping) so nothing new can
-    //      start and isActive returns false.
-    //   2. Unregister the named service from the ServiceManager so shutdown
-    //      callbacks cannot rediscover PAPI as a still-published service.
-    //   3. Drain the registry: run onUnregister(PapiShutdown), release every
-    //      provider object while the owning modules are still loaded.
-    //   4. Drop platform references.
+    // Stop dispatch before withdrawing the service and releasing providers.
     service_->beginShutdown();
 
     if (plugin_) {
         auto &service_manager = plugin_->getServer().getServiceManager();
         service_manager.unregister(std::string(PlaceholderAPI::ServiceName), *service_);
         ServicePublication::withdraw(service_manager, *service_);
-        // Defensive: PAPI registers no other service, but this guarantees the manager
-        // holds nothing owned by this plugin.
         service_manager.unregisterAll(*plugin_);
     }
 
@@ -83,9 +72,7 @@ void PapiBootstrap::stop()
         platform_->detach();
     }
 
-    // A consumer that kept a reference now holds a fully inert native object. It
-    // co-owns the detached platform, so nothing it can call reaches the server, and
-    // the bootstrap's own references go away here.
+    // Retained services remain inert through their detached platform.
     service_.reset();
     platform_.reset();
     plugin_ = nullptr;
