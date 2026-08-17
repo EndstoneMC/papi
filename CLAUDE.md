@@ -439,17 +439,16 @@ it with manual version commits, tags, or GitHub Releases.
    `CMakeLists.txt` via the scikit-build regex metadata provider, and the
    C++ `getVersion()` is generated from `cmake/version.h.in` at configure time.
 4. Run tests, build, and the self-test.
-5. Push `develop` to `personal/develop` and wait for CI to pass.
+5. Ensure CI passes for the pre-release commit.
 
 ### Synchronize the pre-release commit
 
 The non-dry-run workflow requires official `main` and `develop` to point to the same
-commit. After personal CI passes:
+commit. After CI passes:
 
-1. Fetch both remotes and verify ancestry.
+1. Fetch the official refs and verify ancestry.
 2. Fast-forward the pre-release commit to official `main` and `develop`.
 3. Wait for official CI.
-4. Synchronize personal branches.
 
 ### Preview
 
@@ -480,11 +479,9 @@ develop, and the tag all point to the same commit.
   user explicitly asks.
 - Keep commits focused, independently buildable, and easy to revert.
 - Never add a `Co-Authored-By` line for Claude.
-- Do not force-push or rewrite official `origin` history.
-- `origin` is `ReallocAll/papi`, `upstream` is `EndstoneMC/papi`. Verify remote URLs
-  before any release operation.
-- Before a commit has reached `origin`, local and `personal` history may be rewritten
-  when the user authorizes it. Use `--force-with-lease`, never an unguarded force push.
+- Do not force-push or rewrite published branch history.
+- Unpublished local history may be rewritten when explicitly requested. Use
+  `--force-with-lease` for any remote rewrite; never use an unguarded force push.
 - Once a commit is covered by an official branch or a public release tag, preserve it.
 
 ## Changelog
