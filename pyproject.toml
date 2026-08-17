@@ -7,7 +7,7 @@ requires = [
     "auditwheel==6.4.2; sys_platform == 'linux'",
     "endstone==0.11.8; sys_platform == 'linux'",
     "patchelf==0.17.2.4; sys_platform == 'linux'",
-    "wheel==0.45.1; sys_platform == 'linux'",
+    "wheel==0.46.2; sys_platform == 'linux'",
 ]
 build-backend = "papi_build_backend"
 backend-path = ["."]
