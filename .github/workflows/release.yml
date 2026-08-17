@@ -281,15 +281,15 @@ jobs:
 
       - name: Set up MSVC (Windows)
         if: runner.os == 'Windows'
-        uses: TheMrMilchmann/setup-msvc-dev@368ef7d1ee4d1171b31d4a7f67f4d954f903f5a9 # v4
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
 
       - name: Set up CMake and Ninja
-        uses: lukka/get-cmake@fffaaafeea488556c2c12dad60690008bc1caacb # v4.4.2
+        uses: lukka/get-cmake@v4.4.2
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@d16cc544083d96996f923fc4b318fee3cb14b34e # v3.4.1
+        uses: pypa/cibuildwheel@v3.4.1
         env:
           CIBW_BUILD: ${{ matrix.python-tag }}-${{ matrix.platform }}
           CIBW_BUILD_VERBOSITY: 1
@@ -438,13 +438,19 @@ jobs:
           path: ./dist/*.tar.gz
 
   publish:
-    name: Publish GitHub Release
-    if: needs.release.outputs.dry_run != 'true' && needs.release.outputs.published != 'true' && needs.release.outputs.version != ''
+    name: Publish release
+    if: >-
+      github.repository == 'EndstoneMC/papi'
+      && needs.release.outputs.dry_run != 'true'
+      && needs.release.outputs.published != 'true'
+      && needs.release.outputs.version != ''
     needs: [release, build-wheels, build-sdist]
     runs-on: ubuntu-22.04
     timeout-minutes: 10
+    environment: pypi
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -461,10 +467,12 @@ jobs:
       - name: Collect release assets
         shell: bash
         run: |
-          mkdir -p release-assets
+          mkdir -p release-assets pypi-dist
           find artifacts -name '*.whl' -exec cp {} release-assets/ \;
           find artifacts -name '*.tar.gz' -exec cp {} release-assets/ \;
           cp artifacts/release-notes/release_body.md release-assets/
+          cp release-assets/*.whl pypi-dist/
+          cp release-assets/*.tar.gz pypi-dist/
 
       - name: Verify release assets
         shell: bash
@@ -472,10 +480,13 @@ jobs:
           # 10 wheels (5 Python versions x 2 platforms) + 1 sdist.
           whl_count=$(find release-assets -name '*.whl' | wc -l)
           sdist_count=$(find release-assets -name '*.tar.gz' | wc -l)
+          pypi_count=$(find pypi-dist -maxdepth 1 -type f | wc -l)
           echo "Wheels: $whl_count"
           echo "Sdists: $sdist_count"
+          echo "PyPI distributions: $pypi_count"
           test "$whl_count" -eq 10
           test "$sdist_count" -eq 1
+          test "$pypi_count" -eq 11
           test -s release-assets/release_body.md
 
       - name: Atomically finalize release refs
@@ -503,15 +514,21 @@ jobs:
               "$CANDIDATE_SHA:refs/heads/develop" \
               "$CANDIDATE_SHA:refs/tags/v$VERSION"
           else
-            # A previous run finalized refs but failed while creating the GitHub
-            # Release. Rebuilding the same immutable candidate converges here.
+            # A previous run finalized refs but failed while publishing to PyPI or
+            # creating the GitHub Release. Rebuilding the same candidate converges here.
             test "$TAG_SHA" = "$CANDIDATE_SHA"
             test "$MAIN_SHA" = "$CANDIDATE_SHA"
             test "$DEVELOP_SHA" = "$CANDIDATE_SHA"
           fi
 
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi-dist
+          skip-existing: true
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@v3.0.2
         with:
           tag_name: v${{ needs.release.outputs.version }}
           name: v${{ needs.release.outputs.version }}
