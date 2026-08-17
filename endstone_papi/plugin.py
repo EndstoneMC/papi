@@ -37,7 +37,13 @@ class PlaceholderAPIPlugin(Plugin):
         self._bootstrap = _PapiBootstrap()
 
     def on_enable(self) -> None:
+        from endstone.metrics import Metrics
+
         self._bootstrap.start(self)
+
+        # bStats metrics (https://bstats.org/plugin/bukkit/PlaceholderAPI%20by%20Endstone/33349)
+        self._metrics = Metrics(self, service_id=33349)
+
         self.logger.info("PlaceholderAPI is ready.")
 
     def on_disable(self) -> None:
