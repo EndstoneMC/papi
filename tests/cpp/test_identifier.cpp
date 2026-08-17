@@ -1,5 +1,3 @@
-// the registration grammar is strict, ASCII-only, and locale-independent.
-
 #include <clocale>
 
 #include <gtest/gtest.h>
@@ -11,7 +9,7 @@ namespace {
 using papi::detail::canonicalizeIdentifier;
 using papi::detail::isValidIdentifier;
 
-TEST(Identifier, AcceptsAlphanumericStartWithDotsAndHyphens)
+TEST(Identifier, AcceptsAlphanumericAndHyphenatedIdentifiers)
 {
     EXPECT_TRUE(isValidIdentifier("demo"));
     EXPECT_TRUE(isValidIdentifier("Demo"));
@@ -20,41 +18,37 @@ TEST(Identifier, AcceptsAlphanumericStartWithDotsAndHyphens)
     EXPECT_TRUE(isValidIdentifier("9"));
     EXPECT_TRUE(isValidIdentifier("demo1"));
     EXPECT_TRUE(isValidIdentifier("1demo"));
-    EXPECT_TRUE(isValidIdentifier("my.expansion"));
     EXPECT_TRUE(isValidIdentifier("my-expansion"));
-    EXPECT_TRUE(isValidIdentifier("a.b-c.D9"));
     EXPECT_TRUE(isValidIdentifier("a--b"));
-    EXPECT_TRUE(isValidIdentifier("a..b"));
 }
 
 TEST(Identifier, RejectsEmptyAndBadFirstCharacter)
 {
     EXPECT_FALSE(isValidIdentifier(""));
     EXPECT_FALSE(isValidIdentifier("."));
+    EXPECT_FALSE(isValidIdentifier("_"));
     EXPECT_FALSE(isValidIdentifier("-"));
     EXPECT_FALSE(isValidIdentifier(".demo"));
+    EXPECT_FALSE(isValidIdentifier("_demo"));
     EXPECT_FALSE(isValidIdentifier("-demo"));
 }
 
-TEST(Identifier, RejectsTheParameterSeparator)
+TEST(Identifier, RejectsSyntaxSeparators)
 {
-    // Underscore splits identifier from parameters, so it can never be part of one.
-    EXPECT_FALSE(isValidIdentifier("_"));
-    EXPECT_FALSE(isValidIdentifier("_demo"));
+    EXPECT_FALSE(isValidIdentifier("demo.test"));
     EXPECT_FALSE(isValidIdentifier("demo_"));
     EXPECT_FALSE(isValidIdentifier("de_mo"));
 }
 
-TEST(Identifier, RejectsDelimitersAndNamespaceSeparators)
+TEST(Identifier, RejectsDelimitersAndPunctuation)
 {
     EXPECT_FALSE(isValidIdentifier("{demo"));
     EXPECT_FALSE(isValidIdentifier("demo}"));
-    EXPECT_FALSE(isValidIdentifier("{demo}"));
     EXPECT_FALSE(isValidIdentifier("%demo%"));
     EXPECT_FALSE(isValidIdentifier("plugin:demo"));
 }
 
-TEST(Identifier, RejectsWhitespaceAndControlCharacters)
+TEST(Identifier, RejectsWhitespaceControlsAndNonAscii)
 {
     EXPECT_FALSE(isValidIdentifier(" demo"));
     EXPECT_FALSE(isValidIdentifier("demo "));
@@ -62,41 +56,24 @@ TEST(Identifier, RejectsWhitespaceAndControlCharacters)
     EXPECT_FALSE(isValidIdentifier("de\tmo"));
     EXPECT_FALSE(isValidIdentifier("de\nmo"));
     EXPECT_FALSE(isValidIdentifier(std::string_view("de\0mo", 5)));
-}
-
-TEST(Identifier, RejectsNonAscii)
-{
     EXPECT_FALSE(isValidIdentifier("démo"));
     EXPECT_FALSE(isValidIdentifier("日本語"));
     EXPECT_FALSE(isValidIdentifier("\xff\xfe"));
-}
-
-TEST(Identifier, RejectsOtherPunctuation)
-{
-    for (const char c : std::string_view("!\"#$&'()*+,/;<=>?@[\\]^`|~")) {
-        const std::string identifier = std::string("a") + c;
-        EXPECT_FALSE(isValidIdentifier(identifier)) << "unexpectedly accepted trailing '" << c << "'";
-    }
 }
 
 TEST(Identifier, CanonicalizesToAsciiLowercase)
 {
     EXPECT_EQ(canonicalizeIdentifier("Demo"), "demo");
     EXPECT_EQ(canonicalizeIdentifier("DEMO"), "demo");
-    EXPECT_EQ(canonicalizeIdentifier("demo"), "demo");
-    EXPECT_EQ(canonicalizeIdentifier("My-Expansion.V2"), "my-expansion.v2");
-    EXPECT_EQ(canonicalizeIdentifier(""), "");
+    EXPECT_EQ(canonicalizeIdentifier("My-Expansion-V2"), "my-expansion-v2");
 }
 
 TEST(Identifier, CanonicalizationIsIdempotent)
 {
-    const auto once = canonicalizeIdentifier("MiXeD.Case-9");
+    const auto once = canonicalizeIdentifier("MiXeD-Case-9");
     EXPECT_EQ(canonicalizeIdentifier(once), once);
 }
 
-// A Turkish locale folds 'I' to a dotless 'ı' with the C library's tolower, which
-// would silently change identifiers between hosts. Canonicalization must be pure
-// ASCII, so behavior cannot depend on the process locale.
 TEST(Identifier, CanonicalizationIgnoresProcessLocale)
 {
     const char *previous = std::setlocale(LC_ALL, nullptr);

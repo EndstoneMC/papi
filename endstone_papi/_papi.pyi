@@ -81,8 +81,9 @@ class PlaceholderExpansion:
     def identifier(self) -> str:
         """The identifier this expansion answers to.
 
-        Must match ``[A-Za-z0-9][A-Za-z0-9.-]*``, and is canonicalized to lowercase.
-        Underscore separates identifier from parameters and is not allowed here.
+        Must match ``[A-Za-z0-9][A-Za-z0-9-]*``, and is canonicalized to lowercase.
+        Dot separates the identifier from parameters; underscore belongs to parameters.
+        Neither is allowed in an identifier.
         """
 
     @property
@@ -115,14 +116,15 @@ class PlaceholderExpansion:
         """Whether ``on_player_quit`` is implemented. Defaults to False."""
 
     def on_request(self, player: OfflinePlayer | None, params: str) -> str | None:
-        """Resolves an ordinary placeholder.
+        """Resolves an ordinary ``{identifier.params}`` placeholder.
 
+        ``params`` contains everything after the first dot exactly as written.
         Return a ``str``, or None to leave the placeholder text untouched. Any other
         type is a provider error and is not coerced.
         """
 
     def on_relational_request(self, one: Player, two: Player, params: str) -> str | None:
-        """Resolves a relational placeholder between two online players."""
+        """Resolves a relational ``{rel.identifier_params}`` placeholder."""
 
     def on_player_quit(self, player: Player) -> None:
         """Called when a player leaves, if this expansion opted into cleanup."""
@@ -152,10 +154,10 @@ class PlaceholderAPI(Service):
         """Whether this service is still usable."""
 
     def set_placeholders(self, player: OfflinePlayer | None, text: str) -> str:
-        """Replaces every resolvable ``{identifier_params}`` in text."""
+        """Replaces every resolvable ``{identifier.params}`` in text."""
 
     def set_relational_placeholders(self, one: Player, two: Player, text: str) -> str:
-        """Replaces every resolvable ``{rel_identifier_params}`` in text."""
+        """Replaces every resolvable ``{rel.identifier_params}`` in text."""
 
     def contains_placeholders(self, text: str) -> bool:
         """Whether text lexically contains a placeholder-shaped substring."""

@@ -53,8 +53,6 @@ def _run_subprocess(code: str, timeout: float = 10.0) -> subprocess.CompletedPro
 
 
 def test_super_identifier_reentry_is_bounded() -> None:
-    """super().identifier in an override must not recurse unboundedly."""
-
     class SuperIdentifier(PlaceholderExpansion):
         @property
         def identifier(self) -> str:
@@ -67,19 +65,11 @@ def test_super_identifier_reentry_is_bounded() -> None:
             return None
 
     expansion = SuperIdentifier()
-    # Accessing the property must raise (contained), not crash or hang.
     with pytest.raises((RuntimeError, RecursionError)):
         _ = expansion.identifier
 
 
 def test_super_name_reentry_falls_back_to_identifier() -> None:
-    """super().name re-enters getName, which falls back to the identifier.
-
-    The guard returns empty for the re-entered 'name' lookup, so getName falls back
-    to requiredString(identifier). If identifier is a plain class attribute, the
-    fallback succeeds and returns the identifier value.
-    """
-
     class SuperName(PlaceholderExpansion):
         identifier = "demo"
         author = "a"
@@ -93,13 +83,10 @@ def test_super_name_reentry_falls_back_to_identifier() -> None:
             return None
 
     expansion = SuperName()
-    # The guard breaks the name re-entry; getName falls back to identifier.
     assert expansion.name == "demo"
 
 
 def test_super_can_register_reentry_is_bounded() -> None:
-    """super().can_register() in an override must not recurse unboundedly."""
-
     class SuperCanRegister(PlaceholderExpansion):
         identifier = "demo"
         author = "a"
@@ -112,14 +99,10 @@ def test_super_can_register_reentry_is_bounded() -> None:
             return None
 
     expansion = SuperCanRegister()
-    # The guard returns empty for the re-entered 'can_register' lookup;
-    # booleanCall falls back to its default (True).
     assert expansion.can_register() is True
 
 
 def test_super_on_request_reentry_is_bounded() -> None:
-    """super().on_request() in an override must not recurse unboundedly."""
-
     class SuperOnRequest(PlaceholderExpansion):
         identifier = "demo"
         author = "a"
@@ -129,14 +112,11 @@ def test_super_on_request_reentry_is_bounded() -> None:
             return super().on_request(player, params)
 
     expansion = SuperOnRequest()
-    # The guard returns empty for the re-entered 'on_request' lookup;
-    # the trampoline throws "must implement on_request", which is contained.
     with pytest.raises((RuntimeError, RecursionError)):
         _ = expansion.on_request(None, "x")
 
 
 def test_subprocess_super_identifier_does_not_crash() -> None:
-    """In a fresh subprocess with a low recursion limit, super().identifier is bounded."""
     result = _run_subprocess(
         "class E(PlaceholderExpansion):\n"
         "    @property\n"
@@ -162,7 +142,6 @@ def test_subprocess_super_identifier_does_not_crash() -> None:
 
 
 def test_subprocess_super_name_falls_back() -> None:
-    """In a fresh subprocess, super().name falls back to the identifier."""
     result = _run_subprocess(
         "class E(PlaceholderExpansion):\n"
         "    identifier = 'demo'\n"
@@ -185,7 +164,6 @@ def test_subprocess_super_name_falls_back() -> None:
 
 
 def test_two_and_three_level_inheritance_dispatch_exactly_once() -> None:
-    """The most-derived override wins while ordinary Python super() remains usable."""
     from endstone_papi._papi import _TestService
 
     calls: list[str] = []
@@ -211,18 +189,17 @@ def test_two_and_three_level_inheritance_dispatch_exactly_once() -> None:
 
     child_host = _TestService("child-test")
     assert child_host.register_expansion(Child())
-    assert child_host.service.set_placeholders(None, "{multi_x}") == "parent:x:child"
+    assert child_host.service.set_placeholders(None, "{multi.x}") == "parent:x:child"
     assert calls == ["child", "parent"]
 
     calls.clear()
     grandchild_host = _TestService("grandchild-test")
     assert grandchild_host.register_expansion(Grandchild())
-    assert grandchild_host.service.set_placeholders(None, "{multi_y}") == "parent:y:child:grandchild"
+    assert grandchild_host.service.set_placeholders(None, "{multi.y}") == "parent:y:child:grandchild"
     assert calls == ["grandchild", "child", "parent"]
 
 
 def test_mixin_descriptor_and_custom_getattribute_dispatch() -> None:
-    """MRO lookup honors mixins and descriptors without instance/base recursion."""
     from endstone_papi._papi import _TestService
 
     descriptor_reads = 0
@@ -253,7 +230,7 @@ def test_mixin_descriptor_and_custom_getattribute_dispatch() -> None:
 
     host = _TestService("mro-test")
     assert host.register_expansion(Mixed())
-    assert host.service.set_placeholders(None, "{adversarial_x}") == "mixed:x"
+    assert host.service.set_placeholders(None, "{adversarial.x}") == "mixed:x"
     [info] = host.service.expansions
     assert info.name == "Mixin Name"
     assert descriptor_reads == 1
@@ -265,7 +242,6 @@ def test_mixin_descriptor_and_custom_getattribute_dispatch() -> None:
 
 
 def test_all_optional_virtuals_and_callbacks_use_subclass_overrides() -> None:
-    """Capabilities, relational dispatch, cleanup, and unregister share safe MRO lookup."""
     from endstone_papi._papi import _TestService
 
     calls: list[object] = []
@@ -305,8 +281,8 @@ def test_all_optional_virtuals_and_callbacks_use_subclass_overrides() -> None:
 
     host = _TestService("optional-test")
     assert host.register_expansion(Complete())
-    assert host.service.set_placeholders(None, "{complete_x}") == "ordinary:x"
-    assert host.set_relational_placeholders("{rel_complete_since}") == "Alice+Bob:since"
+    assert host.service.set_placeholders(None, "{complete.x}") == "ordinary:x"
+    assert host.set_relational_placeholders("{rel.complete_since}") == "Alice+Bob:since"
     host.handle_player_quit()
     assert host.unregister_expansion("complete")
 
@@ -322,7 +298,6 @@ def test_all_optional_virtuals_and_callbacks_use_subclass_overrides() -> None:
 
 
 def test_dispatch_guard_distinguishes_independent_instances() -> None:
-    """Nested dispatch of the same member on another instance is legitimate."""
     calls: list[str] = []
 
     class Nested(PlaceholderExpansion):
@@ -352,7 +327,6 @@ def test_dispatch_guard_distinguishes_independent_instances() -> None:
 
 
 def test_exception_unwind_clears_guard_for_reuse() -> None:
-    """A raising callback does not poison later dispatch on the same instance."""
     from endstone_papi._papi import _TestService
 
     class Flaky(PlaceholderExpansion):
@@ -373,13 +347,12 @@ def test_exception_unwind_clears_guard_for_reuse() -> None:
     expansion = Flaky()
     host = _TestService("unwind-test")
     assert host.register_expansion(expansion)
-    assert host.service.set_placeholders(None, "{flaky_x}") == "{flaky_x}"
-    assert host.service.set_placeholders(None, "{flaky_x}") == "recovered:x"
+    assert host.service.set_placeholders(None, "{flaky.x}") == "{flaky.x}"
+    assert host.service.set_placeholders(None, "{flaky.x}") == "recovered:x"
     assert expansion.calls == 2
 
 
 def test_subprocess_descriptor_and_getattribute_reentry_are_bounded() -> None:
-    """Adversarial attribute hooks can re-enter the base binding only finitely."""
     result = _run_subprocess(
         "class ReenteringDescriptor:\n"
         "    def __get__(self, instance, owner):\n"

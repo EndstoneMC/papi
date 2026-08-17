@@ -7,7 +7,6 @@ namespace papi::detail {
 std::string replacePlaceholders(const std::string_view text, PlaceholderResolver &resolver)
 {
     if (text.find('{') == std::string_view::npos) {
-        // No candidate can exist, so the resolver is never consulted.
         return std::string(text);
     }
 
@@ -25,18 +24,17 @@ std::string replacePlaceholders(const std::string_view text, PlaceholderResolver
 
         const auto close = text.find('}', open + 1);
         if (close == std::string_view::npos) {
-            // Unmatched opening brace: everything from it on is ordinary text.
             result.append(text.substr(open));
             break;
         }
 
-        // The first closing brace ends the candidate, so nesting is never seen.
         const auto candidate = text.substr(open + 1, close - open - 1);
         const auto token = text.substr(open, close - open + 1);
 
         std::optional<std::string> value;
-        if (const auto separator = candidate.find('_'); separator != std::string_view::npos) {
-            if (const auto raw_identifier = candidate.substr(0, separator); isValidIdentifier(raw_identifier)) {
+        if (const auto separator = candidate.find('.'); separator != std::string_view::npos) {
+            const auto raw_identifier = candidate.substr(0, separator);
+            if (isValidIdentifier(raw_identifier)) {
                 value = resolver.resolve(canonicalizeIdentifier(raw_identifier), candidate.substr(separator + 1));
             }
         }
@@ -48,7 +46,6 @@ std::string replacePlaceholders(const std::string_view text, PlaceholderResolver
             result.append(token);
         }
 
-        // Replacement text is never rescanned.
         pos = close + 1;
     }
 

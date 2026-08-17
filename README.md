@@ -13,32 +13,33 @@ consumer never needs to know which language a placeholder came from.
 
 ## Placeholder syntax
 
-A placeholder is written `{identifier_params}`.
+A placeholder is written `{identifier.params}`.
 
-The **first underscore** separates the identifier from the parameters. The identifier is
+The **first dot** separates the identifier from the parameters. The identifier is
 ASCII-lowercased and matched case-insensitively; the parameters are passed to the
-expansion exactly as written, including case, spaces, and an empty value.
+expansion exactly as written, including underscores, case, spaces, and an empty value.
 
 | Input | Identifier | Params | Notes |
 |---|---|---|---|
-| `{player_name}` | `player` | `name` | the ordinary form |
-| `{PLAYER_NaMe}` | `player` | `NaMe` | identifier lowercased, params preserved |
-| `{player_name_first}` | `player` | `name_first` | only the first underscore splits |
-| `{player_}` | `player` | *(empty)* | dispatched with empty params |
-| `{player}` | — | — | no underscore, so it stays literal |
+| `{player.name}` | `player` | `name` | the ordinary form |
+| `{PLAYER.NaMe}` | `player` | `NaMe` | identifier lowercased, params preserved |
+| `{spark.cpu_process_1m}` | `spark` | `cpu_process_1m` | underscores belong to params |
+| `{player.}` | `player` | *(empty)* | dispatched with empty params |
+| `{player}` | — | — | no dot, so it stays literal |
 
 Anything that cannot be resolved is left exactly as written: malformed syntax, an unknown
 identifier, an expansion that returns no value, or an expansion exception. An empty
 string is a valid replacement. Replacement text is never re-scanned, so parsing is
 one-pass and nonrecursive.
 
-`{rel_identifier_params}` is a separate, relational form handled only by
+`{rel.identifier_params}` is a separate, relational form handled only by
 `setRelationalPlaceholders` / `set_relational_placeholders`, and only by expansions that
-opt in to the relational callback.
+opt in to the relational callback. The part after `rel.` is split at its first underscore
+into the relational expansion identifier and its parameters.
 
-Identifiers must match `[A-Za-z0-9][A-Za-z0-9.-]*`. Registration is case-insensitive,
-so identifiers that differ only by case collide. Underscore and colon are invalid in an
-identifier.
+Identifiers must match `[A-Za-z0-9][A-Za-z0-9-]*`. Registration is case-insensitive,
+so identifiers that differ only by case collide. Dot, underscore, and colon are invalid
+in an identifier.
 
 ## The core provides no placeholders
 

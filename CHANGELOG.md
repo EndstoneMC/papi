@@ -28,9 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   expansion registry, and inert retained-service lifecycle
 - `PlaceholderExpansion` contract for C++ and Python providers, sharing one
   native registry
-- `{identifier_params}` ordinary placeholder syntax with first-underscore split,
+- `{identifier.params}` ordinary placeholder syntax with first-dot split,
   ASCII-lowercase identifier, and exact parameter preservation
-- `{rel_identifier_params}` relational placeholder dispatch with explicit
+- `{rel.identifier_params}` relational placeholder dispatch with explicit
   capability declaration and two-player API
 - GIL-safe Python expansion bridge using pybind11 3 `smart_holder` and
   `trampoline_self_life_support`
@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ExpansionRegisteredEvent` and `ExpansionUnregisteredEvent` metadata-only
   post-commit events
 - Bounded 60-second error throttling with injectable monotonic clock
-- Strict ASCII identifier grammar `[A-Za-z0-9][A-Za-z0-9.-]*`
+- Strict ASCII identifier grammar `[A-Za-z0-9][A-Za-z0-9-]*`
 - Windows and Linux CI with clang-cl/Clang 20, Conan 2, CMake 3.29, and
   CPython 3.10–3.14 wheel matrix
 - Architecture boundary enforcement via automated tests

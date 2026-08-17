@@ -22,21 +22,18 @@ namespace {
 
 bool isValidIdentifier(const std::string_view identifier) noexcept
 {
-    const auto size = identifier.size();
-    if (size == 0) {
+    if (identifier.empty()) {
         return false;
     }
 
-    // substr would violate the noexcept contract.
     const char *const chars = identifier.data();
-    const char first = chars[0];
-    if (!isAsciiLetter(first) && !isAsciiDigit(first)) {
+    if (!isAsciiLetter(chars[0]) && !isAsciiDigit(chars[0])) {
         return false;
     }
 
-    for (std::size_t i = 1; i < size; ++i) {
+    for (std::size_t i = 1; i < identifier.size(); ++i) {
         const char c = chars[i];
-        if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != '.' && c != '-') {
+        if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != '-') {
             return false;
         }
     }

@@ -43,7 +43,7 @@ std::string_view toString(const RegisterError error) noexcept
     case RegisterError::OwnerNotEnabled:
         return "the registering plugin is not enabled";
     case RegisterError::InvalidIdentifier:
-        return "the identifier must match [A-Za-z0-9][A-Za-z0-9.-]*";
+        return "the identifier must match [A-Za-z0-9][A-Za-z0-9-]*";
     case RegisterError::InvalidMetadata:
         return "the author and version must not be empty";
     case RegisterError::InvalidRequiredPluginName:

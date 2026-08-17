@@ -50,8 +50,8 @@ def test_register_and_resolve_round_trip(host: _TestService) -> None:
     host.register_expansion(Greeter())
     service = host.service
 
-    assert service.set_placeholders(None, "Hi {greet_}!") == "Hi hello!"
-    assert service.set_placeholders(None, "Hi {greet_world}!") == "Hi hello:world!"
+    assert service.set_placeholders(None, "Hi {greet.}!") == "Hi hello!"
+    assert service.set_placeholders(None, "Hi {greet.world}!") == "Hi hello:world!"
 
 
 def test_params_preserve_case_and_content(host: _TestService) -> None:
@@ -71,9 +71,9 @@ def test_params_preserve_case_and_content(host: _TestService) -> None:
     host.register_expansion(Echo())
     service = host.service
 
-    # The identifier canonicalizes to "echo"; params keep their exact case.
-    assert service.set_placeholders(None, "{echo_MixedCase}") == "MixedCase"
-    assert captured == ["MixedCase"]
+    # The identifier canonicalizes to "echo"; params keep their exact case and underscores.
+    assert service.set_placeholders(None, "{echo.Mixed_Case}") == "Mixed_Case"
+    assert captured == ["Mixed_Case"]
 
 
 def test_multiple_expansions_resolve_independently(host: _TestService) -> None:
@@ -99,7 +99,7 @@ def test_multiple_expansions_resolve_independently(host: _TestService) -> None:
     host.register_expansion(Beta())
     service = host.service
 
-    assert service.set_placeholders(None, "{alpha_}|{beta_}") == "A|B"
+    assert service.set_placeholders(None, "{alpha.}|{beta.}") == "A|B"
     assert service.is_registered("alpha")
     assert service.is_registered("beta")
     assert service.registered_identifiers == ("alpha", "beta")
@@ -119,7 +119,7 @@ def test_mixed_resolved_and_unresolved_in_one_pass(host: _TestService) -> None:
     host.register_expansion(Known())
     service = host.service
 
-    assert service.set_placeholders(None, "{known_}/{unknown_}") == "ok/{unknown_}"
+    assert service.set_placeholders(None, "{known.}/{unknown.}") == "ok/{unknown.}"
     assert host.warnings == []
 
 
@@ -142,7 +142,7 @@ def test_none_return_preserves_token_silently(host: _TestService) -> None:
     host.register_expansion(Decline())
     service = host.service
 
-    assert service.set_placeholders(None, "[{decline_}]") == "[{decline_}]"
+    assert service.set_placeholders(None, "[{decline.}]") == "[{decline.}]"
     assert host.warnings == []
 
 
@@ -160,7 +160,7 @@ def test_wrong_return_type_is_contained(host: _TestService) -> None:
     host.register_expansion(BadType())
     service = host.service
 
-    assert service.set_placeholders(None, "[{badtype_}]") == "[{badtype_}]"
+    assert service.set_placeholders(None, "[{badtype.x}]") == "[{badtype.x}]"
     assert any("badtype" in w and "str or None" in w for w in host.warnings), host.warnings
 
 
@@ -178,7 +178,7 @@ def test_exception_is_contained(host: _TestService) -> None:
     host.register_expansion(Raiser())
     service = host.service
 
-    assert service.set_placeholders(None, "[{raiser_}]") == "[{raiser_}]"
+    assert service.set_placeholders(None, "[{raiser.x}]") == "[{raiser.x}]"
     assert any("raiser" in w and "deliberate failure" in w for w in host.warnings), host.warnings
 
 
@@ -186,7 +186,7 @@ def test_unknown_identifier_preserves_token_silently(host: _TestService) -> None
     """An unregistered identifier is ordinary text, not a provider error."""
 
     service = host.service
-    assert service.set_placeholders(None, "[{ghost_}]") == "[{ghost_}]"
+    assert service.set_placeholders(None, "[{ghost.x}]") == "[{ghost.x}]"
     assert host.warnings == []
 
 
@@ -199,7 +199,7 @@ def test_contains_placeholders_is_lexical(host: _TestService) -> None:
     """contains_placeholders is a cheap lexical check, independent of registration."""
 
     service = host.service
-    assert service.contains_placeholders("Hello {world_}!")
+    assert service.contains_placeholders("Hello {world.x}!")
     assert service.contains_placeholders("Hello {world}!")
     assert not service.contains_placeholders("Hello world!")
     assert not service.contains_placeholders("Hello {world")
@@ -250,10 +250,10 @@ def test_unregister_stops_resolution(host: _TestService) -> None:
     host.register_expansion(Temp())
     service = host.service
 
-    assert service.set_placeholders(None, "{temp_}") == "temp"
+    assert service.set_placeholders(None, "{temp.}") == "temp"
     assert host.unregister_expansion("temp") is True
     assert service.is_registered("temp") is False
-    assert service.set_placeholders(None, "{temp_}") == "{temp_}"
+    assert service.set_placeholders(None, "{temp.}") == "{temp.}"
 
 
 def test_unregister_invokes_callback_with_explicit_reason(host: _TestService) -> None:
@@ -305,7 +305,7 @@ def test_unregister_all_clears_registry(host: _TestService) -> None:
     count = host.unregister_expansions()
     assert count == 2
     assert service.registered_identifiers == ()
-    assert service.set_placeholders(None, "{a_}{b_}") == "{a_}{b_}"
+    assert service.set_placeholders(None, "{a.}{b.}") == "{a.}{b.}"
 
 
 def test_str_subclass_return_is_contained(host: _TestService) -> None:
@@ -325,7 +325,7 @@ def test_str_subclass_return_is_contained(host: _TestService) -> None:
     host.register_expansion(StrSubclassReturn())
     service = host.service
 
-    assert service.set_placeholders(None, "[{strsub_}]") == "[{strsub_}]"
+    assert service.set_placeholders(None, "[{strsub.}]") == "[{strsub.}]"
     assert any("strsub" in w and "str or None" in w for w in host.warnings), host.warnings
 
 

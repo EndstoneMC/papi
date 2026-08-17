@@ -7,7 +7,7 @@ from endstone_papi import PlaceholderAPI, PlaceholderExpansion
 
 
 class NameExpansion(PlaceholderExpansion):
-    """A minimal provider expansion: answers {player_name}."""
+    """A minimal provider expansion: answers {player.name}."""
 
     identifier = "player"
     author = "Endstone"
@@ -46,5 +46,5 @@ class JoinExample(Plugin):
     def on_player_join(self, event: PlayerJoinEvent) -> None:
         if self._api is None:
             return
-        message = self._api.set_placeholders(event.player, "{player_name} joined the server!")
+        message = self._api.set_placeholders(event.player, "{player.name} joined the server!")
         event.join_message = message

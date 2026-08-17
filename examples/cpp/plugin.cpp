@@ -10,7 +10,7 @@
 namespace {
 
 /**
- * @brief A minimal provider expansion: answers {player_name}.
+ * @brief A minimal provider expansion: answers {player.name}.
  *
  * PAPI's core supplies no placeholder values of its own; every value comes from an
  * expansion like this one, registered by a plugin.
@@ -69,7 +69,7 @@ public:
         if (!api_) {
             return;
         }
-        event.setJoinMessage(api_->setPlaceholders(&event.getPlayer(), "{player_name} joined the server!"));
+        event.setJoinMessage(api_->setPlaceholders(&event.getPlayer(), "{player.name} joined the server!"));
     }
 
 private:

@@ -38,10 +38,11 @@ public:
     /**
      * @brief The identifier this expansion answers to.
      *
-     * Must match <code>[A-Za-z0-9][A-Za-z0-9.-]*</code>. It is canonicalized to
+     * Must match <code>[A-Za-z0-9][A-Za-z0-9-]*</code>. It is canonicalized to
      * ASCII lowercase, so <code>Demo</code> and <code>demo</code> are the same
-     * identifier and cannot both be registered. Underscore is the separator
-     * between identifier and parameters and is therefore not permitted here.
+     * identifier and cannot both be registered. Dot separates the identifier from
+     * parameters, while underscore is available inside parameters, so neither is
+     * permitted in an identifier.
      *
      * @return the identifier, queried once at registration
      */
@@ -113,9 +114,9 @@ public:
      *
      * @param player the player the placeholder is being resolved against; may be
      *        null, and may be an offline player that is not currently online
-     * @param params everything after the first underscore of the placeholder,
-     *        preserved byte for byte including case and spaces; empty when the
-     *        placeholder was written as <code>{identifier_}</code>
+     * @param params everything after the first dot of the placeholder, preserved
+     *        byte for byte including underscores, case and spaces; empty when the
+     *        placeholder was written as <code>{identifier.}</code>
      * @return the replacement value, or nullopt to leave the original
      *         placeholder text untouched
      */
@@ -129,8 +130,8 @@ public:
      *
      * @param one the first player
      * @param two the second player
-     * @param params everything after the first underscore following the
-     *        <code>rel_</code> prefix, preserved byte for byte
+     * @param params everything after the first underscore following the identifier
+     *        in the <code>rel.</code> namespace, preserved byte for byte
      * @return the replacement value, or nullopt to leave the original
      *         placeholder text untouched
      */

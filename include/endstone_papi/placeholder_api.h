@@ -60,10 +60,10 @@ public:
     [[nodiscard]] virtual bool isActive() const noexcept = 0;
 
     /**
-     * @brief Replaces every resolvable <code>{identifier_params}</code> in text.
+     * @brief Replaces every resolvable <code>{identifier.params}</code> in text.
      *
      * The text is scanned once, left to right. For each candidate the identifier
-     * is the part before the first underscore, lowercased, and the parameters are
+     * is the part before the first dot, lowercased, and the parameters are
      * everything after it, preserved exactly. A placeholder is left untouched
      * when it is malformed, its identifier is not registered, or the expansion
      * returns no value or fails. Replacement text is never rescanned.
@@ -77,7 +77,7 @@ public:
                                                       std::string_view text) const = 0;
 
     /**
-     * @brief Replaces every resolvable <code>{rel_identifier_params}</code> in text.
+     * @brief Replaces every resolvable <code>{rel.identifier_params}</code> in text.
      *
      * Only expansions that declare relational support are consulted, and only
      * through PlaceholderExpansion::onRelationalRequest. Ordinary placeholders are
@@ -98,7 +98,7 @@ public:
      *
      * This is a cheap syntactic check for a <code>{</code> followed later by a
      * <code>}</code>. It does not verify that the identifier is valid, registered,
-     * or resolvable, so <code>{}</code> and <code>{unknown_x}</code> both qualify.
+     * or resolvable, so <code>{}</code> and <code>{unknown.x}</code> both qualify.
      *
      * @param text the text to check
      * @return true if an opening brace has a later closing brace

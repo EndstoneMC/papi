@@ -47,8 +47,6 @@ def _run_subprocess(code: str, timeout: float = 10.0) -> subprocess.CompletedPro
 
 
 def test_self_parse_cycle_is_bounded() -> None:
-    """A Python expansion that calls set_placeholders for its own token is bounded."""
-
     result = _run_subprocess(
         "host = _TestService('test')\n"
         "service = host.service\n"
@@ -59,11 +57,11 @@ def test_self_parse_cycle_is_bounded() -> None:
         "    version = '1'\n"
         "\n"
         "    def on_request(self, player, params):\n"
-        "        return service.set_placeholders(player, '{a_x}')\n"
+        "        return service.set_placeholders(player, '{a.x}')\n"
         "\n"
         "host.register_expansion(CycleExpansion())\n"
-        "out = service.set_placeholders(None, '{a_x}')\n"
-        "assert out == '{a_x}', repr(out)\n"
+        "out = service.set_placeholders(None, '{a.x}')\n"
+        "assert out == '{a.x}', repr(out)\n"
         "assert any('cycle' in w for w in host.warnings), host.warnings\n"
         "print('OK')\n"
     )
@@ -72,8 +70,6 @@ def test_self_parse_cycle_is_bounded() -> None:
 
 
 def test_indirect_parse_cycle_is_bounded() -> None:
-    """An indirect cycle (A -> B -> A) is bounded the same way."""
-
     result = _run_subprocess(
         "host = _TestService('test')\n"
         "service = host.service\n"
@@ -84,7 +80,7 @@ def test_indirect_parse_cycle_is_bounded() -> None:
         "    version = '1'\n"
         "\n"
         "    def on_request(self, player, params):\n"
-        "        return service.set_placeholders(player, '{b_y}')\n"
+        "        return service.set_placeholders(player, '{b.y}')\n"
         "\n"
         "class ExpansionB(PlaceholderExpansion):\n"
         "    identifier = 'b'\n"
@@ -92,12 +88,12 @@ def test_indirect_parse_cycle_is_bounded() -> None:
         "    version = '1'\n"
         "\n"
         "    def on_request(self, player, params):\n"
-        "        return service.set_placeholders(player, '{a_x}')\n"
+        "        return service.set_placeholders(player, '{a.x}')\n"
         "\n"
         "host.register_expansion(ExpansionA())\n"
         "host.register_expansion(ExpansionB())\n"
-        "out = service.set_placeholders(None, '{a_x}')\n"
-        "assert out == '{a_x}', repr(out)\n"
+        "out = service.set_placeholders(None, '{a.x}')\n"
+        "assert out == '{a.x}', repr(out)\n"
         "assert any('cycle' in w for w in host.warnings), host.warnings\n"
         "print('OK')\n"
     )
@@ -106,15 +102,13 @@ def test_indirect_parse_cycle_is_bounded() -> None:
 
 
 def test_parse_depth_budget_is_enforced() -> None:
-    """A deep non-cyclic chain that exceeds the depth budget preserves the input."""
-
     result = _run_subprocess(
         "host = _TestService('test')\n"
         "service = host.service\n"
         "\n"
         "chain_length = 12\n"
         "for i in range(chain_length):\n"
-        "    next_token = '{%d_x}' % (i + 1) if i + 1 < chain_length else 'leaf'\n"
+        "    next_token = '{%d.x}' % (i + 1) if i + 1 < chain_length else 'leaf'\n"
         "    cls = type(\n"
         "        'Exp%d' % i,\n"
         "        (PlaceholderExpansion,),\n"
@@ -128,7 +122,7 @@ def test_parse_depth_budget_is_enforced() -> None:
         "    )\n"
         "    host.register_expansion(cls())\n"
         "\n"
-        "out = service.set_placeholders(None, '{0_x}')\n"
+        "out = service.set_placeholders(None, '{0.x}')\n"
         "assert out, repr(out)\n"
         "assert any('depth' in w for w in host.warnings), host.warnings\n"
         "print('OK')\n"
@@ -138,7 +132,6 @@ def test_parse_depth_budget_is_enforced() -> None:
 
 
 def test_three_expansion_cycle_is_bounded_and_guard_is_reusable() -> None:
-    """A -> B -> C -> A is contained, then all guard state is cleared."""
     result = _run_subprocess(
         "host = _TestService('three-cycle')\n"
         "service = host.service\n"
@@ -148,25 +141,25 @@ def test_three_expansion_cycle_is_bounded_and_guard_is_reusable() -> None:
         "    author = 't'\n"
         "    version = '1'\n"
         "    def on_request(self, player, params):\n"
-        "        return service.set_placeholders(player, '{b_x}') if state['cycle'] else 'recovered'\n"
+        "        return service.set_placeholders(player, '{b.x}') if state['cycle'] else 'recovered'\n"
         "class B(PlaceholderExpansion):\n"
         "    identifier = 'b'\n"
         "    author = 't'\n"
         "    version = '1'\n"
         "    def on_request(self, player, params):\n"
-        "        return service.set_placeholders(player, '{c_x}')\n"
+        "        return service.set_placeholders(player, '{c.x}')\n"
         "class C(PlaceholderExpansion):\n"
         "    identifier = 'c'\n"
         "    author = 't'\n"
         "    version = '1'\n"
         "    def on_request(self, player, params):\n"
-        "        return service.set_placeholders(player, '{a_x}')\n"
+        "        return service.set_placeholders(player, '{a.x}')\n"
         "for expansion in (A(), B(), C()):\n"
         "    assert host.register_expansion(expansion)\n"
-        "assert service.set_placeholders(None, '{a_x}') == '{a_x}'\n"
+        "assert service.set_placeholders(None, '{a.x}') == '{a.x}'\n"
         "assert any('cycle' in warning for warning in host.warnings), host.warnings\n"
         "state['cycle'] = False\n"
-        "assert service.set_placeholders(None, '{a_x}') == 'recovered'\n"
+        "assert service.set_placeholders(None, '{a.x}') == 'recovered'\n"
         "print('OK')\n"
     )
     assert result.returncode == 0, result.stderr
@@ -174,7 +167,6 @@ def test_three_expansion_cycle_is_bounded_and_guard_is_reusable() -> None:
 
 
 def test_ordinary_relational_ordinary_cycle_is_bounded() -> None:
-    """An ordinary callback may not cycle back through relational dispatch."""
     result = _run_subprocess(
         "host = _TestService('ordinary-relational')\n"
         "service = host.service\n"
@@ -183,7 +175,7 @@ def test_ordinary_relational_ordinary_cycle_is_bounded() -> None:
         "    author = 't'\n"
         "    version = '1'\n"
         "    def on_request(self, player, params):\n"
-        "        return host.set_relational_placeholders('{rel_b_x}')\n"
+        "        return host.set_relational_placeholders('{rel.b_x}')\n"
         "class RelationalB(PlaceholderExpansion):\n"
         "    identifier = 'b'\n"
         "    author = 't'\n"
@@ -193,10 +185,10 @@ def test_ordinary_relational_ordinary_cycle_is_bounded() -> None:
         "    def on_request(self, player, params):\n"
         "        return None\n"
         "    def on_relational_request(self, one, two, params):\n"
-        "        return service.set_placeholders(one, '{a_x}')\n"
+        "        return service.set_placeholders(one, '{a.x}')\n"
         "assert host.register_expansion(OrdinaryA())\n"
         "assert host.register_expansion(RelationalB())\n"
-        "assert service.set_placeholders(None, '{a_x}') == '{a_x}'\n"
+        "assert service.set_placeholders(None, '{a.x}') == '{a.x}'\n"
         "assert any('cycle' in warning for warning in host.warnings), host.warnings\n"
         "print('OK')\n"
     )
@@ -205,7 +197,6 @@ def test_ordinary_relational_ordinary_cycle_is_bounded() -> None:
 
 
 def test_relational_ordinary_relational_cycle_is_bounded() -> None:
-    """A relational callback may not cycle back through ordinary dispatch."""
     result = _run_subprocess(
         "host = _TestService('relational-ordinary')\n"
         "service = host.service\n"
@@ -218,16 +209,16 @@ def test_relational_ordinary_relational_cycle_is_bounded() -> None:
         "    def on_request(self, player, params):\n"
         "        return None\n"
         "    def on_relational_request(self, one, two, params):\n"
-        "        return service.set_placeholders(one, '{b_x}')\n"
+        "        return service.set_placeholders(one, '{b.x}')\n"
         "class OrdinaryB(PlaceholderExpansion):\n"
         "    identifier = 'b'\n"
         "    author = 't'\n"
         "    version = '1'\n"
         "    def on_request(self, player, params):\n"
-        "        return host.set_relational_placeholders('{rel_a_x}')\n"
+        "        return host.set_relational_placeholders('{rel.a_x}')\n"
         "assert host.register_expansion(RelationalA())\n"
         "assert host.register_expansion(OrdinaryB())\n"
-        "assert host.set_relational_placeholders('{rel_a_x}') == '{rel_a_x}'\n"
+        "assert host.set_relational_placeholders('{rel.a_x}') == '{rel.a_x}'\n"
         "assert any('cycle' in warning for warning in host.warnings), host.warnings\n"
         "print('OK')\n"
     )
@@ -236,7 +227,6 @@ def test_relational_ordinary_relational_cycle_is_bounded() -> None:
 
 
 def test_provider_exception_while_guarded_does_not_poison_next_parse() -> None:
-    """The active-expansion guard is removed when provider dispatch throws."""
     from endstone_papi import PlaceholderExpansion
     from endstone_papi._papi import _TestService
 
@@ -258,13 +248,12 @@ def test_provider_exception_while_guarded_does_not_poison_next_parse() -> None:
     host = _TestService("guard-exception")
     expansion = Flaky()
     assert host.register_expansion(expansion)
-    assert host.service.set_placeholders(None, "{flaky-parse_x}") == "{flaky-parse_x}"
-    assert host.service.set_placeholders(None, "{flaky-parse_x}") == "recovered"
+    assert host.service.set_placeholders(None, "{flaky-parse.x}") == "{flaky-parse.x}"
+    assert host.service.set_placeholders(None, "{flaky-parse.x}") == "recovered"
     assert expansion.calls == 2
 
 
 def test_self_unregister_during_guarded_callback_discards_result_and_allows_reregister() -> None:
-    """Retirement inside a callback defers destruction but clears parse state."""
     from endstone_papi import PlaceholderExpansion
     from endstone_papi._papi import _TestService
 
@@ -291,15 +280,14 @@ def test_self_unregister_during_guarded_callback_discards_result_and_allows_rere
             return "replacement-value"
 
     assert host.register_expansion(SelfRemoving())
-    assert host.service.set_placeholders(None, "{self-remove_x}") == "{self-remove_x}"
+    assert host.service.set_placeholders(None, "{self-remove.x}") == "{self-remove.x}"
     assert not host.service.is_registered("self-remove")
     assert host.register_expansion(Replacement())
-    assert host.service.set_placeholders(None, "{self-remove_x}") == "replacement-value"
+    assert host.service.set_placeholders(None, "{self-remove.x}") == "replacement-value"
     assert calls == ["old", "new"]
 
 
 def test_legitimate_finite_nested_parse_resolves_without_rescanning_output() -> None:
-    """Finite explicit nesting is allowed; replacement output remains single-pass."""
     from endstone_papi import PlaceholderExpansion
     from endstone_papi._papi import _TestService
 
@@ -312,7 +300,7 @@ def test_legitimate_finite_nested_parse_resolves_without_rescanning_output() -> 
         version = "1"
 
         def on_request(self, player, params):
-            return service.set_placeholders(player, "{inner_x}")
+            return service.set_placeholders(player, "{inner.x}")
 
     class Inner(PlaceholderExpansion):
         identifier = "inner"
@@ -320,9 +308,9 @@ def test_legitimate_finite_nested_parse_resolves_without_rescanning_output() -> 
         version = "1"
 
         def on_request(self, player, params):
-            return "leaf:{unresolved_x}"
+            return "leaf:{unresolved.x}"
 
     assert host.register_expansion(Outer())
     assert host.register_expansion(Inner())
-    assert service.set_placeholders(None, "{outer_x}") == "leaf:{unresolved_x}"
+    assert service.set_placeholders(None, "{outer.x}") == "leaf:{unresolved.x}"
     assert host.warnings == []
