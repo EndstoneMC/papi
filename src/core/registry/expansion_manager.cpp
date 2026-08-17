@@ -256,6 +256,13 @@ RegisterResult ExpansionManager::registerExpansion(endstone::Plugin &owner,
     }
 
     info.identifier = canonicalizeIdentifier(raw_identifier);
+    if (info.identifier == "rel") {
+        platform_.log(
+            endstone::Logger::Error,
+            "Plugin '" + owner.getName() +
+                "' tried to register the reserved identifier 'rel', which is used by relational placeholders.");
+        return {false, RegisterError::InvalidIdentifier, {}};
+    }
     info.owner = owner.getName();
 
     if (info.author.empty() || info.version.empty()) {

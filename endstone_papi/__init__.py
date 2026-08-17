@@ -2,7 +2,7 @@
 
 A native C++20 PlaceholderAPI framework for Endstone and Minecraft Bedrock
 Dedicated Server.  Provides a bracket placeholder parser, an owner-aware
-expansion registry, and a service that resolves ``{identifier.params}``
+expansion registry, and a service that resolves ``{identifier:params}``
 placeholders through expansions supplied by C++ or Python plugins.
 """
 

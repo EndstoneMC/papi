@@ -60,11 +60,11 @@ public:
     [[nodiscard]] virtual bool isActive() const noexcept = 0;
 
     /**
-     * @brief Replaces every resolvable <code>{identifier.params}</code> in text.
+     * @brief Replaces every resolvable <code>{identifier:params}</code> in text.
      *
      * The text is scanned once, left to right. For each candidate the identifier
-     * is the part before the first dot, lowercased, and the parameters are
-     * everything after it, preserved exactly. A placeholder is left untouched
+     * is the part before the first colon, lowercased, and the parameters are
+     * everything after it, preserved exactly, including later colons. A placeholder is left untouched
      * when it is malformed, its identifier is not registered, or the expansion
      * returns no value or fails. Replacement text is never rescanned.
      *
@@ -77,11 +77,13 @@ public:
                                                       std::string_view text) const = 0;
 
     /**
-     * @brief Replaces every resolvable <code>{rel.identifier_params}</code> in text.
+     * @brief Replaces every resolvable <code>{rel:identifier:params}</code> in text.
      *
-     * Only expansions that declare relational support are consulted, and only
-     * through PlaceholderExpansion::onRelationalRequest. Ordinary placeholders are
-     * not processed by this method.
+     * The <code>rel:</code> prefix is followed by the expansion identifier and a
+     * second colon; everything after that second colon is passed through unchanged.
+     * Only expansions that declare relational support are consulted, and only through
+     * PlaceholderExpansion::onRelationalRequest. Ordinary placeholders are not
+     * processed by this method.
      *
      * @param one the first player
      * @param two the second player
@@ -98,7 +100,7 @@ public:
      *
      * This is a cheap syntactic check for a <code>{</code> followed later by a
      * <code>}</code>. It does not verify that the identifier is valid, registered,
-     * or resolvable, so <code>{}</code> and <code>{unknown.x}</code> both qualify.
+     * or resolvable, so <code>{}</code> and <code>{unknown:x}</code> both qualify.
      *
      * @param text the text to check
      * @return true if an opening brace has a later closing brace
@@ -134,7 +136,8 @@ public:
      *
      * The expansion's metadata, capabilities, and PlaceholderExpansion::canRegister
      * are validated first, then the registry commits atomically. Registration
-     * fails without side effects if the identifier is invalid or already taken,
+     * fails without side effects if the identifier is invalid, is the reserved
+     * identifier <code>rel</code>, or is already taken,
      * the metadata is empty, the owner is not enabled, a declared required plugin
      * is missing or disabled, the preflight refuses, or this is not the primary
      * thread.

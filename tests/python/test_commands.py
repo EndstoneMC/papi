@@ -118,9 +118,9 @@ def test_parse_target_preserves_a_multi_word_message_argument() -> None:
     plugin = make_plugin(service)
     sender = RecordingSender()
 
-    assert plugin.on_command(sender, None, ["parse", "--null", "hello {a.b} world"]) is True
-    assert service.parsed == [(None, "hello {a.b} world")]
-    assert sender.messages == ["parsed:hello {a.b} world"]
+    assert plugin.on_command(sender, None, ["parse", "--null", "hello {a:b} world"]) is True
+    assert service.parsed == [(None, "hello {a:b} world")]
+    assert sender.messages == ["parsed:hello {a:b} world"]
 
 
 def test_parse_without_target_preserves_a_multi_word_message_argument() -> None:
@@ -128,9 +128,9 @@ def test_parse_without_target_preserves_a_multi_word_message_argument() -> None:
     plugin = make_plugin(service)
     sender = RecordingSender()
 
-    assert plugin.on_command(sender, None, ["parse", "hello {a.b} world"]) is True
-    assert service.parsed == [(None, "hello {a.b} world")]
-    assert sender.messages == ["parsed:hello {a.b} world"]
+    assert plugin.on_command(sender, None, ["parse", "hello {a:b} world"]) is True
+    assert service.parsed == [(None, "hello {a:b} world")]
+    assert sender.messages == ["parsed:hello {a:b} world"]
 
 
 def test_parse_with_explicit_null_target_passes_no_player() -> None:
@@ -138,8 +138,8 @@ def test_parse_with_explicit_null_target_passes_no_player() -> None:
     plugin = make_plugin(service)
     sender = RecordingSender()
 
-    assert plugin.on_command(sender, None, ["parse", "--null", "{demo.x}"]) is True
-    assert service.parsed == [(None, "{demo.x}")]
+    assert plugin.on_command(sender, None, ["parse", "--null", "{demo:x}"]) is True
+    assert service.parsed == [(None, "{demo:x}")]
 
 
 def test_parse_rejects_me_from_a_non_player_sender() -> None:
@@ -149,7 +149,7 @@ def test_parse_rejects_me_from_a_non_player_sender() -> None:
 
     # The console is not a player, so 'me' has no meaning and must be refused rather
     # than casting the sender.
-    assert plugin.on_command(sender, None, ["parse", "me", "{demo.x}"]) is True
+    assert plugin.on_command(sender, None, ["parse", "me", "{demo:x}"]) is True
     assert any("player" in error.lower() for error in sender.errors)
     assert not service.parsed
 

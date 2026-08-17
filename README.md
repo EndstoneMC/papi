@@ -13,33 +13,37 @@ consumer never needs to know which language a placeholder came from.
 
 ## Placeholder syntax
 
-A placeholder is written `{identifier.params}`.
+A placeholder is written `{identifier:params}`.
 
-The **first dot** separates the identifier from the parameters. The identifier is
+The **first colon** separates the identifier from the parameters. The identifier is
 ASCII-lowercased and matched case-insensitively; the parameters are passed to the
-expansion exactly as written, including underscores, case, spaces, and an empty value.
+expansion exactly as written, including underscores, dots, later colons, case, spaces,
+and an empty value.
 
-| Input | Identifier | Params | Notes |
-|---|---|---|---|
-| `{player.name}` | `player` | `name` | the ordinary form |
-| `{PLAYER.NaMe}` | `player` | `NaMe` | identifier lowercased, params preserved |
-| `{spark.cpu_process_1m}` | `spark` | `cpu_process_1m` | underscores belong to params |
-| `{player.}` | `player` | *(empty)* | dispatched with empty params |
-| `{player}` | — | — | no dot, so it stays literal |
+| Input                      | Identifier | Params             | Notes                                   |
+| -------------------------- | ---------- | ------------------ | --------------------------------------- |
+| `{player:name}`          | `player` | `name`           | the ordinary form                       |
+| `{PLAYER:NaMe}`          | `player` | `NaMe`           | identifier lowercased, params preserved |
+| `{spark:cpu_process_1m}` | `spark`  | `cpu_process_1m` | underscores belong to params            |
+| `{player:}`              | `player` | *(empty)*        | dispatched with empty params            |
+| `{player}`               | —         | —                 | no colon, so it stays literal           |
 
 Anything that cannot be resolved is left exactly as written: malformed syntax, an unknown
 identifier, an expansion that returns no value, or an expansion exception. An empty
 string is a valid replacement. Replacement text is never re-scanned, so parsing is
 one-pass and nonrecursive.
 
-`{rel.identifier_params}` is a separate, relational form handled only by
+`{rel:identifier:params}` is a separate, relational form handled only by
 `setRelationalPlaceholders` / `set_relational_placeholders`, and only by expansions that
-opt in to the relational callback. The part after `rel.` is split at its first underscore
-into the relational expansion identifier and its parameters.
+opt in to the relational callback. The `rel:` prefix selects relational parsing. The next colon separates the relational
+expansion identifier from its parameters; everything after that second colon is passed
+through unchanged. For example, `{rel:friends:is_friend}` dispatches identifier `friends`
+with params `is_friend`.
 
 Identifiers must match `[A-Za-z0-9][A-Za-z0-9-]*`. Registration is case-insensitive,
 so identifiers that differ only by case collide. Dot, underscore, and colon are invalid
-in an identifier.
+in an identifier. `rel` is reserved by the relational syntax and cannot be registered
+as an expansion identifier.
 
 ## The core provides no placeholders
 
@@ -140,12 +144,12 @@ ordinary placeholder player may be null / `None`.
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `/papi parse <text>` | Parse text using the sender when it is a player; otherwise use a null player |
-| `/papi parse <target> <text>` | Parse text for a player name, `me`, or `--null` target |
-| `/papi list` | List every registered identifier |
-| `/papi info <identifier>` | Show one expansion's metadata |
+| Command                         | Description                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| `/papi parse <text>`          | Parse text using the sender when it is a player; otherwise use a null player |
+| `/papi parse <target> <text>` | Parse text for a player name,`me`, or `--null` target                    |
+| `/papi list`                  | List every registered identifier                                             |
+| `/papi info <identifier>`     | Show one expansion's metadata                                                |
 
 All require the `papi.command.papi` permission, which defaults to operators. `me` is
 valid only for a player sender; invalid player names are rejected. Text may contain

@@ -116,15 +116,18 @@ class PlaceholderExpansion:
         """Whether ``on_player_quit`` is implemented. Defaults to False."""
 
     def on_request(self, player: OfflinePlayer | None, params: str) -> str | None:
-        """Resolves an ordinary ``{identifier.params}`` placeholder.
+        """Resolves an ordinary ``{identifier:params}`` placeholder.
 
-        ``params`` contains everything after the first dot exactly as written.
+        ``params`` contains everything after the first colon exactly as written.
         Return a ``str``, or None to leave the placeholder text untouched. Any other
         type is a provider error and is not coerced.
         """
 
     def on_relational_request(self, one: Player, two: Player, params: str) -> str | None:
-        """Resolves a relational ``{rel.identifier_params}`` placeholder."""
+        """Resolves a relational ``{rel:identifier:params}`` placeholder.
+
+        ``params`` contains everything after the second colon exactly as written.
+        """
 
     def on_player_quit(self, player: Player) -> None:
         """Called when a player leaves, if this expansion opted into cleanup."""
@@ -154,16 +157,19 @@ class PlaceholderAPI(Service):
         """Whether this service is still usable."""
 
     def set_placeholders(self, player: OfflinePlayer | None, text: str) -> str:
-        """Replaces every resolvable ``{identifier.params}`` in text."""
+        """Replaces every resolvable ``{identifier:params}`` in text."""
 
     def set_relational_placeholders(self, one: Player, two: Player, text: str) -> str:
-        """Replaces every resolvable ``{rel.identifier_params}`` in text."""
+        """Replaces every resolvable ``{rel:identifier:params}`` in text."""
 
     def contains_placeholders(self, text: str) -> bool:
         """Whether text lexically contains a placeholder-shaped substring."""
 
     def is_registered(self, identifier: str) -> bool:
-        """Whether an identifier currently has an expansion registered."""
+        """Whether an identifier currently has an expansion registered.
+
+        ``rel`` is reserved by relational syntax and cannot be registered.
+        """
 
     @property
     def registered_identifiers(self) -> tuple[str, ...]:

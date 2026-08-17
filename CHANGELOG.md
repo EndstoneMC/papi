@@ -22,15 +22,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pip install endstone-papi` resolves the required Endstone C++ runtime
   automatically.
 
+### Changed
+
+- Placeholder routing now uses a colon namespace boundary: ordinary placeholders are
+  `{identifier:params}` and relational placeholders are `{rel:identifier:params}`.
+  Only the routing colon(s) are interpreted by PAPI; provider params preserve
+  underscores, dots, later colons, case, spaces, and empty values exactly as written.
+- `rel` is reserved for relational dispatch and cannot be registered as an ordinary
+  expansion identifier. Legacy underscore- and dot-separated outer syntax is not
+  accepted.
+
 ### Added
 
 - Native C++20 PlaceholderAPI framework with bracket parser, owner-aware
   expansion registry, and inert retained-service lifecycle
 - `PlaceholderExpansion` contract for C++ and Python providers, sharing one
   native registry
-- `{identifier.params}` ordinary placeholder syntax with first-dot split,
+- `{identifier:params}` ordinary placeholder syntax with first-colon split,
   ASCII-lowercase identifier, and exact parameter preservation
-- `{rel.identifier_params}` relational placeholder dispatch with explicit
+- `{rel:identifier:params}` relational placeholder dispatch with explicit
   capability declaration and two-player API
 - GIL-safe Python expansion bridge using pybind11 3 `smart_holder` and
   `trampoline_self_life_support`

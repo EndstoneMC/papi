@@ -58,7 +58,7 @@ TEST(BracketReplacer, ReplacesASimplePlaceholder)
         return std::nullopt;
     };
 
-    EXPECT_EQ(parse("{player.name}", resolver), "Alex");
+    EXPECT_EQ(parse("{player:name}", resolver), "Alex");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "name");
@@ -67,26 +67,27 @@ TEST(BracketReplacer, ReplacesASimplePlaceholder)
 TEST(BracketReplacer, LowercasesTheIdentifierAndPreservesParameterCase)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{PLAYER.NaMe}", resolver), "<NaMe>");
+    EXPECT_EQ(parse("{PLAYER:NaMe}", resolver), "<NaMe>");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "NaMe");
 }
 
-TEST(BracketReplacer, SplitsOnlyAtTheFirstDot)
+TEST(BracketReplacer, SplitsOnlyAtTheFirstColon)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{player.name_first}", resolver), "<name_first>");
+    EXPECT_EQ(parse("{player:name_first}", resolver), "<name_first>");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "name_first");
 
     resolver.lookups.clear();
-    EXPECT_EQ(parse("{player.___}", resolver), "<___>");
-    EXPECT_EQ(resolver.lookups[0].params, "___");
+    EXPECT_EQ(parse("{player:a.b_c:d}", resolver), "<a.b_c:d>");
+    ASSERT_EQ(resolver.lookups.size(), 1U);
+    EXPECT_EQ(resolver.lookups[0].params, "a.b_c:d");
 }
 
-TEST(BracketReplacer, RequiresADot)
+TEST(BracketReplacer, RequiresAColon)
 {
     RecordingResolver resolver;
     EXPECT_EQ(parse("{player}", resolver), "{player}");
@@ -101,7 +102,7 @@ TEST(BracketReplacer, DispatchesWithEmptyParameters)
         return params.empty() ? std::optional<std::string>("empty") : std::nullopt;
     };
 
-    EXPECT_EQ(parse("{player.}", resolver), "empty");
+    EXPECT_EQ(parse("{player:}", resolver), "empty");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
     EXPECT_EQ(resolver.lookups[0].params, "");
@@ -110,16 +111,16 @@ TEST(BracketReplacer, DispatchesWithEmptyParameters)
 TEST(BracketReplacer, EmptyIdentifierAndEmptyBracesStayLiteral)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{.x}", resolver), "{.x}");
+    EXPECT_EQ(parse("{:x}", resolver), "{:x}");
     EXPECT_EQ(parse("{}", resolver), "{}");
-    EXPECT_EQ(parse("{.}", resolver), "{.}");
+    EXPECT_EQ(parse("{:}", resolver), "{:}");
     EXPECT_TRUE(resolver.lookups.empty());
 }
 
 TEST(BracketReplacer, UnknownIdentifierStaysLiteral)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{unknown.x}", resolver), "{unknown.x}");
+    EXPECT_EQ(parse("{unknown:x}", resolver), "{unknown:x}");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "unknown");
 }
@@ -131,7 +132,7 @@ TEST(BracketReplacer, DeclinedValueKeepsTheOriginalToken)
         return std::nullopt;
     };
 
-    EXPECT_EQ(parse("{player.x}", resolver), "{player.x}");
+    EXPECT_EQ(parse("{player:x}", resolver), "{player:x}");
     EXPECT_EQ(resolver.lookups.size(), 1U);
 }
 
@@ -142,13 +143,13 @@ TEST(BracketReplacer, EmptyStringIsAValidValue)
         return std::string();
     };
 
-    EXPECT_EQ(parse("a{player.x}b", resolver), "ab");
+    EXPECT_EQ(parse("a{player:x}b", resolver), "ab");
 }
 
 TEST(BracketReplacer, ReplacesSeveralPlaceholdersInOrderAndKeepsSurroundingText)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("A{player.x}B{player.y}C", resolver), "A<x>B<y>C");
+    EXPECT_EQ(parse("A{player:x}B{player:y}C", resolver), "A<x>B<y>C");
     ASSERT_EQ(resolver.lookups.size(), 2U);
     EXPECT_EQ(resolver.lookups[0].params, "x");
     EXPECT_EQ(resolver.lookups[1].params, "y");
@@ -157,18 +158,18 @@ TEST(BracketReplacer, ReplacesSeveralPlaceholdersInOrderAndKeepsSurroundingText)
 TEST(BracketReplacer, AdjacentReplacementsConcatenate)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{player.x}{player.y}", resolver), "<x><y>");
+    EXPECT_EQ(parse("{player:x}{player:y}", resolver), "<x><y>");
     EXPECT_EQ(resolver.lookups.size(), 2U);
 }
 
 TEST(BracketReplacer, MalformedBracesStayLiteral)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{player.x", resolver), "{player.x");
-    EXPECT_EQ(parse("player.x}", resolver), "player.x}");
+    EXPECT_EQ(parse("{player:x", resolver), "{player:x");
+    EXPECT_EQ(parse("player:x}", resolver), "player:x}");
     EXPECT_EQ(parse("}{", resolver), "}{");
     EXPECT_EQ(parse("abc}", resolver), "abc}");
-    EXPECT_EQ(parse("abc{player.x", resolver), "abc{player.x");
+    EXPECT_EQ(parse("abc{player:x", resolver), "abc{player:x");
     EXPECT_EQ(parse("{", resolver), "{");
     EXPECT_EQ(parse("}", resolver), "}");
     EXPECT_EQ(parse("}}}", resolver), "}}}");
@@ -179,7 +180,7 @@ TEST(BracketReplacer, MalformedBracesStayLiteral)
 TEST(BracketReplacer, LeadingClosingBraceDoesNotBlockALaterToken)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("}{player.x}", resolver), "}<x>");
+    EXPECT_EQ(parse("}{player:x}", resolver), "}<x>");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].params, "x");
 }
@@ -187,26 +188,26 @@ TEST(BracketReplacer, LeadingClosingBraceDoesNotBlockALaterToken)
 TEST(BracketReplacer, SpaceBeforeTheSeparatorInvalidatesTheToken)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{ player.x}", resolver), "{ player.x}");
-    EXPECT_EQ(parse("{play er.x}", resolver), "{play er.x}");
-    EXPECT_EQ(parse("{player .x}", resolver), "{player .x}");
-    EXPECT_EQ(parse("{\tplayer.x}", resolver), "{\tplayer.x}");
+    EXPECT_EQ(parse("{ player:x}", resolver), "{ player:x}");
+    EXPECT_EQ(parse("{play er:x}", resolver), "{play er:x}");
+    EXPECT_EQ(parse("{player :x}", resolver), "{player :x}");
+    EXPECT_EQ(parse("{\tplayer:x}", resolver), "{\tplayer:x}");
     EXPECT_TRUE(resolver.lookups.empty());
 }
 
 TEST(BracketReplacer, ParametersPreserveSpacesAndPunctuation)
 {
     RecordingResolver resolver;
-    EXPECT_EQ(parse("{player.hello world}", resolver), "<hello world>");
+    EXPECT_EQ(parse("{player:hello world}", resolver), "<hello world>");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].params, "hello world");
 
     resolver.lookups.clear();
-    EXPECT_EQ(parse("{player.a:b%c-d.e/f}", resolver), "<a:b%c-d.e/f>");
+    EXPECT_EQ(parse("{player:a:b%c-d.e/f}", resolver), "<a:b%c-d.e/f>");
     EXPECT_EQ(resolver.lookups[0].params, "a:b%c-d.e/f");
 
     resolver.lookups.clear();
-    (void)parse("{player. }", resolver);
+    (void)parse("{player: }", resolver);
     EXPECT_EQ(resolver.lookups[0].params, " ");
 }
 
@@ -215,12 +216,12 @@ TEST(BracketReplacer, ReplacementValueIsNotReparsed)
     RecordingResolver resolver;
     resolver.handler = [](const std::string_view identifier, std::string_view) -> std::optional<std::string> {
         if (identifier == "player") {
-            return "{other.x}";
+            return "{other:x}";
         }
         return "SHOULD NOT HAPPEN";
     };
 
-    EXPECT_EQ(parse("{player.x}", resolver), "{other.x}");
+    EXPECT_EQ(parse("{player:x}", resolver), "{other:x}");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
 }
@@ -229,10 +230,10 @@ TEST(BracketReplacer, BraceRichReplacementsSurviveVerbatim)
 {
     RecordingResolver resolver;
     resolver.handler = [](std::string_view, std::string_view) -> std::optional<std::string> {
-        return "{{}}{a.b}}}{{";
+        return "{{}}{a:b}}}{{";
     };
 
-    EXPECT_EQ(parse("{player.x}", resolver), "{{}}{a.b}}}{{");
+    EXPECT_EQ(parse("{player:x}", resolver), "{{}}{a:b}}}{{");
     EXPECT_EQ(resolver.lookups.size(), 1U);
 }
 
@@ -240,14 +241,14 @@ TEST(BracketReplacer, NestingIsNotRecognized)
 {
     RecordingResolver resolver;
 
-    EXPECT_EQ(parse("{{player.x}", resolver), "{{player.x}");
+    EXPECT_EQ(parse("{{player:x}", resolver), "{{player:x}");
     EXPECT_TRUE(resolver.lookups.empty());
 
     resolver.lookups.clear();
-    EXPECT_EQ(parse("{player.{other.x}}", resolver), "<{other.x>}");
+    EXPECT_EQ(parse("{player:{other:x}}", resolver), "<{other:x>}");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "player");
-    EXPECT_EQ(resolver.lookups[0].params, "{other.x");
+    EXPECT_EQ(resolver.lookups[0].params, "{other:x");
 }
 
 TEST(BracketReplacer, InputWithoutCandidatesIsReturnedUnchangedWithoutLookups)
@@ -266,7 +267,7 @@ TEST(BracketReplacer, BinaryAndUtf8BytesPassThroughUnchanged)
     EXPECT_EQ(parse(text, resolver), text);
 
     resolver.lookups.clear();
-    EXPECT_EQ(parse("{player.caf\xc3\xa9}", resolver), "<caf\xc3\xa9>");
+    EXPECT_EQ(parse("{player:caf\xc3\xa9}", resolver), "<caf\xc3\xa9>");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].params, "caf\xc3\xa9");
 }
@@ -278,8 +279,8 @@ TEST(BracketReplacer, LongAdversarialInputCompletesInLinearTime)
     std::string text;
     text.reserve(4'000'000);
     for (int i = 0; i < 100'000; ++i) {
-        text += "{player.x}";
-        text += "{unknown.y}";
+        text += "{player:x}";
+        text += "{unknown:y}";
         text += "{no_close";
         text += "}}";
         text += "{{";
@@ -292,14 +293,14 @@ TEST(BracketReplacer, LongAdversarialInputCompletesInLinearTime)
     EXPECT_FALSE(output.empty());
     EXPECT_LT(elapsed, std::chrono::seconds{10});
     EXPECT_NE(output.find("<x>"), std::string::npos);
-    EXPECT_NE(output.find("{unknown.y}"), std::string::npos);
+    EXPECT_NE(output.find("{unknown:y}"), std::string::npos);
 }
 
 TEST(BracketReplacer, ManyOpeningBracesDoNotDegradeToQuadratic)
 {
     RecordingResolver resolver;
 
-    const std::string text = std::string(500'000, '{') + "player.x}" + std::string(500'000, '{');
+    const std::string text = std::string(500'000, '{') + "player:x}" + std::string(500'000, '{');
 
     const auto start = std::chrono::steady_clock::now();
     const auto output = replacePlaceholders(text, resolver);
@@ -318,8 +319,8 @@ TEST(BracketReplacer, ScanIsMonotonicAndLosesNoBytes)
     };
 
     const std::vector<std::string> inputs = {
-        "{player.x}",      "a{player.x}b",     "{a}{b}{c}",   "{{{a.b}}}", "}{}{", "{a.b}{c.d}{e.f}",
-        "{no_close{a.b}",  "text{a.b}text{c", "{}{}{}",      "{.}{.}",      "{a.b", "}}}{{{ ",
+        "{player:x}",     "a{player:x}b",    "{a}{b}{c}", "{{{a:b}}}", "}{}{", "{a:b}{c:d}{e:f}",
+        "{no_close{a:b}", "text{a:b}text{c", "{}{}{}",    "{.}{.}",    "{a:b", "}}}{{{ ",
     };
     for (const auto &input : inputs) {
         EXPECT_EQ(replacePlaceholders(input, resolver), input) << "input='" << input << "'";
@@ -330,8 +331,8 @@ TEST(Contains, TrueWheneverAnOpeningBraceHasALaterClosingBrace)
 {
     EXPECT_TRUE(containsPlaceholders("{}"));
     EXPECT_TRUE(containsPlaceholders("{player}"));
-    EXPECT_TRUE(containsPlaceholders("{unknown.x}"));
-    EXPECT_TRUE(containsPlaceholders("{player.name}"));
+    EXPECT_TRUE(containsPlaceholders("{unknown:x}"));
+    EXPECT_TRUE(containsPlaceholders("{player:name}"));
     EXPECT_TRUE(containsPlaceholders("a{}b"));
     EXPECT_TRUE(containsPlaceholders("{ }"));
     EXPECT_TRUE(containsPlaceholders("{{}}"));
@@ -354,9 +355,9 @@ TEST(Contains, FalseWithoutABracePair)
 TEST(Contains, IgnoresValidityAndRegistration)
 {
     EXPECT_TRUE(containsPlaceholders("{.}"));
-    EXPECT_TRUE(containsPlaceholders("{ player.x}"));
+    EXPECT_TRUE(containsPlaceholders("{ player:x}"));
     EXPECT_TRUE(containsPlaceholders("{plugin:demo.x}"));
-    EXPECT_TRUE(containsPlaceholders("{日本.x}"));
+    EXPECT_TRUE(containsPlaceholders("{日本:x}"));
 }
 
 }  // namespace

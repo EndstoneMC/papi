@@ -24,14 +24,14 @@ void ServicePublication::publish(const endstone::ServiceManager &manager,
                                  const std::shared_ptr<PlaceholderAPI> &service)
 {
     auto &state = publicationState();
-    const std::lock_guard lock(state.mutex);
+    const std::scoped_lock lock(state.mutex);
     state.services[&manager] = service;
 }
 
 void ServicePublication::withdraw(const endstone::ServiceManager &manager, const PlaceholderAPI &service)
 {
     auto &state = publicationState();
-    const std::lock_guard lock(state.mutex);
+    const std::scoped_lock lock(state.mutex);
     const auto it = state.services.find(&manager);
     if (it == state.services.end()) {
         return;
@@ -53,7 +53,7 @@ std::shared_ptr<PlaceholderAPI> ServicePublication::load(const endstone::Service
     std::shared_ptr<PlaceholderAPI> published;
     {
         auto &state = publicationState();
-        const std::lock_guard lock(state.mutex);
+        const std::scoped_lock lock(state.mutex);
         const auto it = state.services.find(&manager);
         if (it == state.services.end()) {
             return nullptr;

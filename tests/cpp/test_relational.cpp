@@ -48,7 +48,7 @@ TEST_F(RelationalTest, ResolvesWithBothExactPlayers)
     auto expansion = addRelational("friends");
     expansion->relational_value = "since-yesterday";
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_since}"), "since-yesterday");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:since}"), "since-yesterday");
 
     ASSERT_EQ(expansion->relational_calls, 1);
     EXPECT_EQ(expansion->last_relational_params, "since");
@@ -62,7 +62,7 @@ TEST_F(RelationalTest, PlayerOrderIsPreserved)
 {
     auto expansion = addRelational("friends");
 
-    (void)service_->setRelationalPlaceholders(bob_, alice_, "{rel.friends_x}");
+    (void)service_->setRelationalPlaceholders(bob_, alice_, "{rel:friends:x}");
     EXPECT_EQ(expansion->last_relational_one, &bob_);
     EXPECT_EQ(expansion->last_relational_two, &alice_);
 }
@@ -72,16 +72,26 @@ TEST_F(RelationalTest, IdentifierIsLowercasedAndParamsPreserved)
     auto expansion = addRelational("friends");
     expansion->relational_value = "value";
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.FRIENDS_Since_When}"), "value");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{REL:FRIENDS:Since_When}"), "value");
     ASSERT_EQ(expansion->relational_calls, 1);
     EXPECT_EQ(expansion->last_relational_params, "Since_When");
+}
+
+TEST_F(RelationalTest, ParamsPreserveDotsUnderscoresAndLaterColons)
+{
+    auto expansion = addRelational("friends");
+    expansion->relational_value = "value";
+
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:a_b.c:d}"), "value");
+    ASSERT_EQ(expansion->relational_calls, 1);
+    EXPECT_EQ(expansion->last_relational_params, "a_b.c:d");
 }
 
 TEST_F(RelationalTest, UnknownIdentifierStaysLiteral)
 {
     addRelational("friends");
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.missing_x}"), "{rel.missing_x}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:missing:x}"), "{rel:missing:x}");
 }
 
 TEST_F(RelationalTest, NonRelationalExpansionIsNotDispatched)
@@ -91,7 +101,7 @@ TEST_F(RelationalTest, NonRelationalExpansionIsNotDispatched)
     ordinary->value = "ordinary-value";
     ASSERT_TRUE(service_->registerExpansion(owner_, ordinary));
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_since}"), "{rel.friends_since}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:since}"), "{rel:friends:since}");
     EXPECT_EQ(ordinary->relational_calls, 0);
     EXPECT_EQ(ordinary->request_calls, 0);
 }
@@ -100,11 +110,11 @@ TEST_F(RelationalTest, NullValueAndExceptionsStayLiteral)
 {
     auto declining = addRelational("friends");
     declining->relational_value = std::nullopt;
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_x}"), "{rel.friends_x}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:x}"), "{rel:friends:x}");
 
     auto throwing = addRelational("family");
     throwing->throw_from_relational = true;
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.family_x}"), "{rel.family_x}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:family:x}"), "{rel:family:x}");
 
     EXPECT_TRUE(service_->isActive());
     EXPECT_TRUE(platform_->logger.anyContains("relational"));
@@ -119,7 +129,7 @@ TEST_F(RelationalTest, RepeatedRelationalFailuresAreThrottled)
     expansion->throw_from_relational = true;
 
     for (int i = 0; i < 50; ++i) {
-        (void)service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_x}");
+        (void)service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:x}");
     }
     EXPECT_EQ(platform_->logger.countAtLeast(endstone::Logger::Error), 1U);
 }
@@ -129,13 +139,13 @@ TEST_F(RelationalTest, MalformedRelationalTokensStayLiteral)
     addRelational("friends");
 
     const std::vector<std::string> malformed = {
-        "{rel.friends}",    // no relational params after the identifier
-        "{rel._x}",         // empty relational identifier
-        "{rel.}",           // nothing after the rel namespace
-        "{rel}",            // no dot separator
-        "{rel.friends_x",   // missing close
-        "rel.friends_x}",   // missing open
-        "{rel. friends_x}"  // invalid relational identifier
+        "{rel:friends}",    // no relational params after the identifier
+        "{rel::x}",         // empty relational identifier
+        "{rel:}",           // nothing after the rel namespace
+        "{rel}",            // no colon separator
+        "{rel:friends:x",   // missing close
+        "rel:friends:x}",   // missing open
+        "{rel: friends:x}"  // invalid relational identifier
     };
 
     for (const auto &text : malformed) {
@@ -143,25 +153,31 @@ TEST_F(RelationalTest, MalformedRelationalTokensStayLiteral)
     }
 }
 
+TEST_F(RelationalTest, LegacyRelationalSeparatorsStayLiteral)
+{
+    auto expansion = addRelational("friends");
+
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_since}"), "{rel.friends_since}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends_since}"), "{rel:friends_since}");
+    EXPECT_EQ(expansion->relational_calls, 0);
+}
+
 TEST_F(RelationalTest, OrdinaryParsingNeverInvokesTheRelationalCallback)
 {
     auto expansion = addRelational("friends");
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rel.friends_since}"), "{rel.friends_since}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rel:friends:since}"), "{rel:friends:since}");
     EXPECT_EQ(expansion->relational_calls, 0);
     EXPECT_EQ(expansion->request_calls, 0);
 }
 
-TEST_F(RelationalTest, OrdinaryIdentifierNamedRelIsTreatedNormally)
+TEST_F(RelationalTest, RelIsReservedAndCannotShadowRelationalSyntax)
 {
     auto rel = std::make_shared<FakeExpansion>("rel");
-    rel->value = "ordinary";
-    ASSERT_TRUE(service_->registerExpansion(owner_, rel));
-    auto relational = addRelational("friends");
+    EXPECT_FALSE(service_->registerExpansion(owner_, rel));
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rel.friends_since}"), "ordinary");
-    ASSERT_EQ(rel->request_calls, 1);
-    EXPECT_EQ(rel->last_params, "friends_since");
+    auto relational = addRelational("friends");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rel:friends:since}"), "{rel:friends:since}");
     EXPECT_EQ(relational->relational_calls, 0);
 }
 
@@ -171,7 +187,7 @@ TEST_F(RelationalTest, RelationalParsingNeverInvokesTheOrdinaryCallback)
     expansion->value = "ordinary-value";
     expansion->relational_value = "relational-value";
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_x}"), "relational-value");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:x}"), "relational-value");
     EXPECT_EQ(expansion->request_calls, 0);
 }
 
@@ -181,7 +197,7 @@ TEST_F(RelationalTest, OrdinaryTokensAreUntouchedByRelationalParsing)
     ordinary->value = "Alex";
     ASSERT_TRUE(service_->registerExpansion(owner_, ordinary));
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{player.name}"), "{player.name}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{player:name}"), "{player:name}");
     EXPECT_EQ(ordinary->request_calls, 0);
 }
 
@@ -193,8 +209,8 @@ TEST_F(RelationalTest, MixedTextResolvesOnlyRelationalTokens)
     ordinary->value = "Alex";
     ASSERT_TRUE(service_->registerExpansion(owner_, ordinary));
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "a{rel.friends_x}b{player.name}c"),
-              "ayesb{player.name}c");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "a{rel:friends:x}b{player:name}c"),
+              "ayesb{player:name}c");
 }
 
 TEST_F(RelationalTest, SeveralRelationalTokensResolveInOrder)
@@ -204,7 +220,7 @@ TEST_F(RelationalTest, SeveralRelationalTokensResolveInOrder)
     auto family = addRelational("family");
     family->relational_value = "K";
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_a}{rel.family_b}"), "FK");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:a}{rel:family:b}"), "FK");
     EXPECT_EQ(friends->last_relational_params, "a");
     EXPECT_EQ(family->last_relational_params, "b");
 }
@@ -212,9 +228,9 @@ TEST_F(RelationalTest, SeveralRelationalTokensResolveInOrder)
 TEST_F(RelationalTest, RelationalValueIsNotReparsed)
 {
     auto expansion = addRelational("friends");
-    expansion->relational_value = "{rel.friends_again}";
+    expansion->relational_value = "{rel:friends:again}";
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_x}"), "{rel.friends_again}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:x}"), "{rel:friends:again}");
     EXPECT_EQ(expansion->relational_calls, 1);
 }
 
@@ -223,7 +239,7 @@ TEST_F(RelationalTest, EmptyParametersAfterTheIdentifierAreDispatched)
     auto expansion = addRelational("friends");
     expansion->relational_value = "empty";
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_}"), "empty");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:}"), "empty");
     ASSERT_EQ(expansion->relational_calls, 1);
     EXPECT_EQ(expansion->last_relational_params, "");
 }
@@ -233,7 +249,7 @@ TEST_F(RelationalTest, RelationalParsingRequiresThePrimaryThread)
     auto expansion = addRelational("friends");
     platform_->primary_thread = false;
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_x}"), "{rel.friends_x}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:x}"), "{rel:friends:x}");
     EXPECT_EQ(expansion->relational_calls, 0);
     EXPECT_TRUE(platform_->logger.anyContains("server thread"));
 }
@@ -243,7 +259,7 @@ TEST_F(RelationalTest, InertServiceReturnsRelationalInputUnchanged)
     auto expansion = addRelational("friends");
     service_->shutdown();
 
-    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel.friends_x}"), "{rel.friends_x}");
+    EXPECT_EQ(service_->setRelationalPlaceholders(alice_, bob_, "{rel:friends:x}"), "{rel:friends:x}");
     EXPECT_EQ(expansion->relational_calls, 0);
 }
 

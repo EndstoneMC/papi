@@ -101,8 +101,8 @@ protected:
     {
         ASSERT_TRUE(register_(service_.get(), &owner_));
         EXPECT_FALSE(is_destroyed_());
-        EXPECT_EQ(service_->setPlaceholders(nullptr, "{shared-demo.x}"), "shared-value-x");
-        EXPECT_EQ(service_->setPlaceholders(nullptr, "{shared-demo.hello}"), "shared-value-hello");
+        EXPECT_EQ(service_->setPlaceholders(nullptr, "{shared-demo:x}"), "shared-value-x");
+        EXPECT_EQ(service_->setPlaceholders(nullptr, "{shared-demo:hello}"), "shared-value-hello");
     }
 
     void expectDestroyedAndUnload(UnregisterReason reason)
@@ -127,7 +127,7 @@ TEST_F(ProviderSharedPtrDsoTest, ProviderOwnedSharedPtrSurvivesRequestAndExplici
     registerAndRequest();
 
     EXPECT_TRUE(service_->unregisterExpansion(owner_, "shared-demo"));
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{shared-demo.x}"), "{shared-demo.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{shared-demo:x}"), "{shared-demo:x}");
     expectDestroyedAndUnload(UnregisterReason::Explicit);
 }
 

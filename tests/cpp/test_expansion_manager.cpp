@@ -103,10 +103,10 @@ TEST_F(ExpansionManagerTest, DuplicateCanonicalIdentifierFailsAtomically)
 TEST_F(ExpansionManagerTest, RejectsEveryInvalidIdentifierClass)
 {
     const std::vector<std::string> invalid = {
-        "",        "_",       "_demo",    "demo_x",  ".",       ".demo",    "demo.",   "my.expansion",
-        "a.b-c.D", "-demo",   "{demo}",   "demo}",   "%demo%",  "a:b",      "a b",     " demo",
-        "demo ",   "de\tmo",  "démo",     "日本",    "demo\n",  "demo/x",   "demo\\",  "a+b",
-        "a,b",     "a;b",     "a\"b",     "a'b",     "a(b)",    "a[b]",     "a|b",
+        "",        "_",      "_demo",  "demo_x", ".",      ".demo",  "demo.",  "my.expansion",
+        "a.b-c.D", "-demo",  "{demo}", "demo}",  "%demo%", "a:b",    "a b",    " demo",
+        "demo ",   "de\tmo", "démo",   "日本",   "demo\n", "demo/x", "demo\\", "a+b",
+        "a,b",     "a;b",    "a\"b",   "a'b",    "a(b)",   "a[b]",   "a|b",
     };
 
     for (const auto &identifier : invalid) {
@@ -117,6 +117,19 @@ TEST_F(ExpansionManagerTest, RejectsEveryInvalidIdentifierClass)
         EXPECT_EQ(expansion->can_register_calls, 0) << "identifier='" << identifier << "'";
     }
     EXPECT_EQ(manager_.size(), 0U);
+}
+
+TEST_F(ExpansionManagerTest, RelIdentifierIsReservedForRelationalSyntax)
+{
+    for (const std::string identifier : {"rel", "REL", "ReL"}) {
+        auto expansion = std::make_shared<FakeExpansion>(identifier);
+        const auto result = manager_.registerExpansion(owner_, expansion);
+        EXPECT_FALSE(result.registered);
+        EXPECT_EQ(result.error, RegisterError::InvalidIdentifier);
+        EXPECT_EQ(expansion->can_register_calls, 0);
+    }
+    EXPECT_EQ(manager_.size(), 0U);
+    EXPECT_TRUE(platform_.logger.anyContains("reserved identifier 'rel'"));
 }
 
 TEST_F(ExpansionManagerTest, AcceptsAlphanumericAndHyphenatedIdentifiers)
@@ -562,18 +575,18 @@ TEST_F(ExpansionManagerTest, PlayerCleanupSnapshotHonoursTheCopiedCapability)
 
 TEST_F(ExpansionManagerTest, RelationalCapabilityIsCopiedNotProbed)
 {
-    auto relational = std::make_shared<FakeExpansion>("rel");
+    auto relational = std::make_shared<FakeExpansion>("friends");
     relational->relational = true;
     const auto result = manager_.registerExpansion(owner_, relational);
     ASSERT_TRUE(result.registered);
     EXPECT_TRUE(result.info.relational);
 
-    const auto entry = manager_.findCanonical("rel");
+    const auto entry = manager_.findCanonical("friends");
     ASSERT_NE(entry, nullptr);
     EXPECT_TRUE(entry->supportsRelationalPlaceholders());
 
     relational->relational = false;
-    EXPECT_TRUE(manager_.findCanonical("rel")->supportsRelationalPlaceholders());
+    EXPECT_TRUE(manager_.findCanonical("friends")->supportsRelationalPlaceholders());
 }
 
 TEST_F(ExpansionManagerTest, MetadataQueriesAreSafeWhileTheRegistryMutates)

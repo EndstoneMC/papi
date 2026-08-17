@@ -32,60 +32,70 @@ public:
     std::vector<Lookup> lookups;
 };
 
-TEST(DotSyntax, SplitsAtFirstDot)
+TEST(ColonSyntax, SplitsAtFirstColon)
 {
     RecordingResolver resolver;
 
-    EXPECT_EQ(replacePlaceholders("{spark.cpu_process_1m}", resolver), "cpu_process_1m");
+    EXPECT_EQ(replacePlaceholders("{spark:cpu_process_1m}", resolver), "cpu_process_1m");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "spark");
     EXPECT_EQ(resolver.lookups[0].params, "cpu_process_1m");
 }
 
-TEST(DotSyntax, PreservesKeyExactly)
+TEST(ColonSyntax, PreservesParamsExactly)
 {
     RecordingResolver resolver;
 
-    EXPECT_EQ(replacePlaceholders("{SPARK.Cpu_Process_1M}", resolver), "Cpu_Process_1M");
+    EXPECT_EQ(replacePlaceholders("{SPARK:Cpu_Process.1M:Raw}", resolver), "Cpu_Process.1M:Raw");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_EQ(resolver.lookups[0].identifier, "spark");
-    EXPECT_EQ(resolver.lookups[0].params, "Cpu_Process_1M");
+    EXPECT_EQ(resolver.lookups[0].params, "Cpu_Process.1M:Raw");
 }
 
-TEST(DotSyntax, EmptyKeyIsValid)
+TEST(ColonSyntax, EmptyParamsAreValid)
 {
     RecordingResolver resolver;
 
-    EXPECT_EQ(replacePlaceholders("{spark.}", resolver), "");
+    EXPECT_EQ(replacePlaceholders("{spark:}", resolver), "");
     ASSERT_EQ(resolver.lookups.size(), 1U);
     EXPECT_TRUE(resolver.lookups[0].params.empty());
 }
 
-TEST(DotSyntax, MissingDotStaysLiteral)
+TEST(ColonSyntax, MissingColonStaysLiteral)
 {
     RecordingResolver resolver;
 
+    EXPECT_EQ(replacePlaceholders("{spark}", resolver), "{spark}");
     EXPECT_EQ(replacePlaceholders("{spark_cpu_process_1m}", resolver), "{spark_cpu_process_1m}");
     EXPECT_TRUE(resolver.lookups.empty());
 }
 
-TEST(DotSyntax, DotInKeyIsPreservedAndUnderscoreIdentifierIsRejected)
+TEST(ColonSyntax, LegacyDotSeparatorIsNotRecognized)
 {
     RecordingResolver resolver;
 
-    EXPECT_EQ(replacePlaceholders("{spark.cpu.value}", resolver), "cpu.value");
-    EXPECT_EQ(replacePlaceholders("{spark_cpu.value}", resolver), "{spark_cpu.value}");
-    EXPECT_EQ(replacePlaceholders("{spark.cpu_process_1m}", resolver), "cpu_process_1m");
+    EXPECT_EQ(replacePlaceholders("{spark.cpu_process_1m}", resolver), "{spark.cpu_process_1m}");
+    EXPECT_TRUE(resolver.lookups.empty());
 }
 
-TEST(DotSyntax, DeclinedValuePreservesOriginalToken)
+TEST(ColonSyntax, UnderscoreAndDotRemainProviderSyntax)
+{
+    RecordingResolver resolver;
+
+    EXPECT_EQ(replacePlaceholders("{spark:cpu.value}", resolver), "cpu.value");
+    EXPECT_EQ(replacePlaceholders("{spark:cpu_process_1m}", resolver), "cpu_process_1m");
+    EXPECT_EQ(replacePlaceholders("{spark:a_b.c:d}", resolver), "a_b.c:d");
+    EXPECT_EQ(replacePlaceholders("{spark_cpu:value}", resolver), "{spark_cpu:value}");
+}
+
+TEST(ColonSyntax, DeclinedValuePreservesOriginalToken)
 {
     RecordingResolver resolver;
     resolver.handler = [](std::string_view, std::string_view) -> std::optional<std::string> {
         return std::nullopt;
     };
 
-    EXPECT_EQ(replacePlaceholders("{spark.cpu_process_1m}", resolver), "{spark.cpu_process_1m}");
+    EXPECT_EQ(replacePlaceholders("{spark:cpu_process_1m}", resolver), "{spark:cpu_process_1m}");
 }
 
 }  // namespace

@@ -209,13 +209,15 @@ public:
     [[nodiscard]] std::optional<std::string> resolve(const std::string_view canonical_identifier,
                                                      const std::string_view params) override
     {
-        // Strip the relational prefix before ordinary identifier parsing.
+        // Relational placeholders use {rel:identifier:params}. The generic bracket
+        // parser already stripped "rel:"; split only the next colon so provider
+        // params remain byte-for-byte intact, including any later colons.
         constexpr std::string_view prefix = "rel";
         if (canonical_identifier != prefix) {
             return std::nullopt;
         }
 
-        const auto separator = params.find('_');
+        const auto separator = params.find(':');
         if (separator == std::string_view::npos) {
             return std::nullopt;
         }

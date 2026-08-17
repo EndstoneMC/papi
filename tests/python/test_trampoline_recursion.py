@@ -189,13 +189,13 @@ def test_two_and_three_level_inheritance_dispatch_exactly_once() -> None:
 
     child_host = _TestService("child-test")
     assert child_host.register_expansion(Child())
-    assert child_host.service.set_placeholders(None, "{multi.x}") == "parent:x:child"
+    assert child_host.service.set_placeholders(None, "{multi:x}") == "parent:x:child"
     assert calls == ["child", "parent"]
 
     calls.clear()
     grandchild_host = _TestService("grandchild-test")
     assert grandchild_host.register_expansion(Grandchild())
-    assert grandchild_host.service.set_placeholders(None, "{multi.y}") == "parent:y:child:grandchild"
+    assert grandchild_host.service.set_placeholders(None, "{multi:y}") == "parent:y:child:grandchild"
     assert calls == ["grandchild", "child", "parent"]
 
 
@@ -230,7 +230,7 @@ def test_mixin_descriptor_and_custom_getattribute_dispatch() -> None:
 
     host = _TestService("mro-test")
     assert host.register_expansion(Mixed())
-    assert host.service.set_placeholders(None, "{adversarial.x}") == "mixed:x"
+    assert host.service.set_placeholders(None, "{adversarial:x}") == "mixed:x"
     [info] = host.service.expansions
     assert info.name == "Mixin Name"
     assert descriptor_reads == 1
@@ -281,8 +281,8 @@ def test_all_optional_virtuals_and_callbacks_use_subclass_overrides() -> None:
 
     host = _TestService("optional-test")
     assert host.register_expansion(Complete())
-    assert host.service.set_placeholders(None, "{complete.x}") == "ordinary:x"
-    assert host.set_relational_placeholders("{rel.complete_since}") == "Alice+Bob:since"
+    assert host.service.set_placeholders(None, "{complete:x}") == "ordinary:x"
+    assert host.set_relational_placeholders("{rel:complete:since}") == "Alice+Bob:since"
     host.handle_player_quit()
     assert host.unregister_expansion("complete")
 
@@ -347,8 +347,8 @@ def test_exception_unwind_clears_guard_for_reuse() -> None:
     expansion = Flaky()
     host = _TestService("unwind-test")
     assert host.register_expansion(expansion)
-    assert host.service.set_placeholders(None, "{flaky.x}") == "{flaky.x}"
-    assert host.service.set_placeholders(None, "{flaky.x}") == "recovered:x"
+    assert host.service.set_placeholders(None, "{flaky:x}") == "{flaky:x}"
+    assert host.service.set_placeholders(None, "{flaky:x}") == "recovered:x"
     assert expansion.calls == 2
 
 

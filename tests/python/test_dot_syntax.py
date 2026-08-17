@@ -11,7 +11,7 @@ from endstone_papi import PlaceholderExpansion
 from endstone_papi._papi import _TestService
 
 
-def test_python_provider_receives_underscore_key_from_dot_syntax() -> None:
+def test_python_provider_receives_params_from_colon_syntax_verbatim() -> None:
     seen: list[str] = []
 
     class SparkExpansion(PlaceholderExpansion):
@@ -23,14 +23,14 @@ def test_python_provider_receives_underscore_key_from_dot_syntax() -> None:
             seen.append(params)
             return params
 
-    host = _TestService("dot-syntax")
+    host = _TestService("colon-syntax")
     assert host.register_expansion(SparkExpansion())
 
-    assert host.service.set_placeholders(None, "{spark.cpu_process_1m}") == "cpu_process_1m"
-    assert seen == ["cpu_process_1m"]
+    assert host.service.set_placeholders(None, "{spark:cpu_process.1m:raw}") == "cpu_process.1m:raw"
+    assert seen == ["cpu_process.1m:raw"]
 
 
-def test_old_underscore_separator_is_not_recognized() -> None:
+def test_legacy_outer_separators_are_not_recognized() -> None:
     class SparkExpansion(PlaceholderExpansion):
         identifier = "spark"
         author = "test"
@@ -39,14 +39,16 @@ def test_old_underscore_separator_is_not_recognized() -> None:
         def on_request(self, player, params):
             return "unexpected"
 
-    host = _TestService("strict-syntax")
+    host = _TestService("strict-colon-syntax")
     assert host.register_expansion(SparkExpansion())
 
-    token = "{spark_cpu_process_1m}"
-    assert host.service.set_placeholders(None, token) == token
+    for token in ("{spark_cpu_process_1m}", "{spark.cpu_process_1m}"):
+        assert host.service.set_placeholders(None, token) == token
 
 
-def test_relational_dot_syntax_uses_rel_namespace() -> None:
+def test_relational_colon_syntax_uses_rel_prefix_and_second_colon() -> None:
+    seen: list[str] = []
+
     class FriendsExpansion(PlaceholderExpansion):
         identifier = "friends"
         author = "test"
@@ -59,9 +61,31 @@ def test_relational_dot_syntax_uses_rel_namespace() -> None:
             return None
 
         def on_relational_request(self, one, two, params):
+            seen.append(params)
             return params
 
-    host = _TestService("dot-relational")
+    host = _TestService("colon-relational")
     assert host.register_expansion(FriendsExpansion())
 
-    assert host.set_relational_placeholders("{rel.friends_since_1m}") == "since_1m"
+    assert host.set_relational_placeholders("{rel:friends:since_1m}") == "since_1m"
+    assert host.set_relational_placeholders("{rel:friends:a_b.c:d}") == "a_b.c:d"
+    assert seen == ["since_1m", "a_b.c:d"]
+
+    for token in ("{rel.friends_since_1m}", "{rel:friends_since_1m}"):
+        assert host.set_relational_placeholders(token) == token
+    assert seen == ["since_1m", "a_b.c:d"]
+
+
+def test_rel_identifier_is_reserved() -> None:
+    class RelExpansion(PlaceholderExpansion):
+        identifier = "ReL"
+        author = "test"
+        version = "1"
+
+        def on_request(self, player, params):
+            return "shadowed"
+
+    host = _TestService("reserved-rel")
+    assert host.register_expansion(RelExpansion()) is False
+    token = "{rel:friends:is_friend}"
+    assert host.service.set_placeholders(None, token) == token

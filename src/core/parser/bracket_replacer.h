@@ -14,7 +14,7 @@ public:
      * @brief Resolves one placeholder.
      *
      * @param canonical_identifier the identifier, already lowercased and validated
-     * @param params everything after the first dot, byte for byte
+     * @param params everything after the first colon, byte for byte
      * @return the replacement value, or nullopt to keep the original token
      */
     [[nodiscard]] virtual std::optional<std::string> resolve(std::string_view canonical_identifier,
@@ -22,11 +22,11 @@ public:
 };
 
 /**
- * @brief Replaces every resolvable <code>{identifier.params}</code> in text.
+ * @brief Replaces every resolvable <code>{identifier:params}</code> in text.
  *
- * The candidate splits at its first dot. The identifier must satisfy the registration
+ * The candidate splits at its first colon. The identifier must satisfy the registration
  * grammar and is ASCII-lowercased. Parameters are passed through untouched, including
- * underscores, case, spaces, punctuation, and an empty value.
+ * underscores, dots, later colons, case, spaces, punctuation, and an empty value.
  *
  * A candidate the resolver declines is emitted exactly as it appeared. Replacement
  * text is never rescanned. The scan is linear, uses no regular expression, and does

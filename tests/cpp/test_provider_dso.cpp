@@ -119,15 +119,15 @@ TEST_F(ProviderDsoTest, FullLifecycleFromExternalModule)
         auto expansion = makeExpansion();
         ASSERT_NE(expansion, nullptr);
         ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
-        EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo.x}"), "value-x");
-        EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo.hello}"), "value-hello");
+        EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo:x}"), "value-x");
+        EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo:hello}"), "value-hello");
     }
     EXPECT_FALSE(is_destroyed_());
     EXPECT_TRUE(service_->unregisterExpansion(owner_, "demo"));
     EXPECT_TRUE(is_destroyed_());
     EXPECT_EQ(last_reason_(), UnregisterReason::Explicit);
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo.x}"), "{demo.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo:x}"), "{demo:x}");
 }
 
 TEST_F(ProviderDsoTest, OwnerDisableDestroysExpansionBeforeUnload)
@@ -162,7 +162,7 @@ TEST_F(ProviderDsoTest, RetainedServiceIsInertAfterProviderDsoUnload)
     {
         auto expansion = makeExpansion();
         ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
-        EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo.x}"), "value-x");
+        EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo:x}"), "value-x");
     }
 
     auto retained = std::shared_ptr<papi::PlaceholderAPI>(service_);
@@ -175,15 +175,15 @@ TEST_F(ProviderDsoTest, RetainedServiceIsInertAfterProviderDsoUnload)
     lib_.reset();
 
     EXPECT_FALSE(retained->isActive());
-    EXPECT_EQ(retained->setPlaceholders(nullptr, "{demo.x}"), "{demo.x}");
+    EXPECT_EQ(retained->setPlaceholders(nullptr, "{demo:x}"), "{demo:x}");
     EXPECT_TRUE(retained->getExpansions().empty());
     EXPECT_TRUE(retained->getRegisteredIdentifiers().empty());
     EXPECT_FALSE(retained->isRegistered("demo"));
-    EXPECT_TRUE(retained->containsPlaceholders("{demo.x}"));
+    EXPECT_TRUE(retained->containsPlaceholders("{demo:x}"));
 
     auto fresh = std::make_shared<PlaceholderApiImpl>(platform_, papi_plugin_.getName());
     EXPECT_TRUE(fresh->isActive());
-    EXPECT_EQ(fresh->setPlaceholders(nullptr, "{demo.x}"), "{demo.x}");
+    EXPECT_EQ(fresh->setPlaceholders(nullptr, "{demo:x}"), "{demo:x}");
     fresh->shutdown();
 }
 

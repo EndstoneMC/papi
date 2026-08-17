@@ -220,9 +220,9 @@ PYBIND11_MODULE(_papi, m)
         .def_property_readonly("active", &papi::PlaceholderAPI::isActive,
                                "Whether this service is still usable. False once PAPI has been disabled.")
         .def("set_placeholders", &papi::PlaceholderAPI::setPlaceholders, py::arg("player"), py::arg("text"),
-             "Replaces every resolvable {identifier.params} in text.")
+             "Replaces every resolvable {identifier:params} in text.")
         .def("set_relational_placeholders", &papi::PlaceholderAPI::setRelationalPlaceholders, py::arg("one"),
-             py::arg("two"), py::arg("text"), "Replaces every resolvable {rel.identifier_params} in text.")
+             py::arg("two"), py::arg("text"), "Replaces every resolvable {rel:identifier:params} in text.")
         .def("contains_placeholders", &papi::PlaceholderAPI::containsPlaceholders, py::arg("text"),
              "Whether text lexically contains a placeholder-shaped substring.")
         .def("is_registered", &papi::PlaceholderAPI::isRegistered, py::arg("identifier"),

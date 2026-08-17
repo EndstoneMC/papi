@@ -32,7 +32,7 @@ std::string replacePlaceholders(const std::string_view text, PlaceholderResolver
         const auto token = text.substr(open, close - open + 1);
 
         std::optional<std::string> value;
-        if (const auto separator = candidate.find('.'); separator != std::string_view::npos) {
+        if (const auto separator = candidate.find(':'); separator != std::string_view::npos) {
             const auto raw_identifier = candidate.substr(0, separator);
             if (isValidIdentifier(raw_identifier)) {
                 value = resolver.resolve(canonicalizeIdentifier(raw_identifier), candidate.substr(separator + 1));

@@ -105,14 +105,14 @@ TEST_F(LifecycleTest, ProviderIsReleasedBeforeItsModuleUnloads)
         auto expansion = std::make_shared<ModuleBackedExpansion>("demo", module_loaded, destructions);
         ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
     }
-    ASSERT_EQ(service_->setPlaceholders(nullptr, "{demo.x}"), "value");
+    ASSERT_EQ(service_->setPlaceholders(nullptr, "{demo:x}"), "value");
 
     platform_->disable(owner_);
     service_->handlePluginDisabled(owner_);
     EXPECT_EQ(destructions, 1);
 
     module_loaded = false;
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo.x}"), "{demo.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo:x}"), "{demo:x}");
 }
 
 TEST_F(LifecycleTest, PapiShutdownReleasesProvidersBeforeModulesUnload)
@@ -128,7 +128,7 @@ TEST_F(LifecycleTest, PapiShutdownReleasesProvidersBeforeModulesUnload)
     EXPECT_EQ(destructions, 1);
 
     module_loaded = false;
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo.x}"), "{demo.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo:x}"), "{demo:x}");
 }
 
 TEST_F(LifecycleTest, ExplicitUnregisterReleasesTheProviderImmediately)
@@ -172,10 +172,10 @@ TEST_F(LifecycleTest, ServerReloadLeavesNoCallableBehindAndAllowsFreshRegistrati
         auto expansion = std::make_shared<ModuleBackedExpansion>("demo", second_module, second_destructions);
         ASSERT_TRUE(reloaded->registerExpansion(owner_, expansion));
     }
-    EXPECT_EQ(reloaded->setPlaceholders(nullptr, "{demo.x}"), "value");
+    EXPECT_EQ(reloaded->setPlaceholders(nullptr, "{demo:x}"), "value");
 
     EXPECT_FALSE(service_->isActive());
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo.x}"), "{demo.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{demo:x}"), "{demo:x}");
 
     reloaded->shutdown();
     EXPECT_EQ(second_destructions, 1);
@@ -211,7 +211,7 @@ TEST_F(LifecycleTest, MetadataQueriesCompleteWhileAProviderCallbackIsBlocked)
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
 
-    std::thread parser([&] { EXPECT_EQ(service_->setPlaceholders(nullptr, "{slow.x}"), "value"); });
+    std::thread parser([&] { EXPECT_EQ(service_->setPlaceholders(nullptr, "{slow:x}"), "value"); });
 
     while (!inside_callback.load(std::memory_order_acquire)) {
         std::this_thread::yield();
@@ -220,7 +220,7 @@ TEST_F(LifecycleTest, MetadataQueriesCompleteWhileAProviderCallbackIsBlocked)
     EXPECT_EQ(service_->getExpansions().size(), 1U);
     EXPECT_EQ(service_->getRegisteredIdentifiers().size(), 1U);
     EXPECT_TRUE(service_->isRegistered("slow"));
-    EXPECT_TRUE(service_->containsPlaceholders("{slow.x}"));
+    EXPECT_TRUE(service_->containsPlaceholders("{slow:x}"));
 
     may_return.store(true, std::memory_order_release);
     parser.join();
@@ -241,9 +241,7 @@ TEST_F(LifecycleTest, UnregisterIsVisibleImmediatelyEvenWhileACallbackRuns)
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
 
-    std::thread parser([&] {
-        EXPECT_EQ(service_->setPlaceholders(nullptr, "{slow.x}"), "{slow.x}");
-    });
+    std::thread parser([&] { EXPECT_EQ(service_->setPlaceholders(nullptr, "{slow:x}"), "{slow:x}"); });
 
     while (!inside_callback.load(std::memory_order_acquire)) {
         std::this_thread::yield();
@@ -273,7 +271,7 @@ TEST_F(LifecycleTest, UnregisterEventFiresAfterDeferredCleanup)
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
 
-    std::thread parser([&] { EXPECT_EQ(service_->setPlaceholders(nullptr, "{slow.x}"), "{slow.x}"); });
+    std::thread parser([&] { EXPECT_EQ(service_->setPlaceholders(nullptr, "{slow:x}"), "{slow:x}"); });
 
     while (!inside_callback.load(std::memory_order_acquire)) {
         std::this_thread::yield();
@@ -298,7 +296,7 @@ TEST_F(LifecycleTest, NonStandardExceptionsAreContained)
     auto expansion = std::make_shared<NonStandardThrowingExpansion>();
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rogue.x}"), "{rogue.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rogue:x}"), "{rogue:x}");
     EXPECT_TRUE(platform_->logger.anyContains("unknown C++ exception"));
 
     EXPECT_NO_THROW(service_->shutdown());
@@ -314,7 +312,7 @@ TEST_F(LifecycleTest, ServiceStaysUsableAfterAProviderFails)
     healthy->value = "ok";
     ASSERT_TRUE(service_->registerExpansion(owner_, healthy));
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{broken.a}/{healthy.b}"), "{broken.a}/ok");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{broken:a}/{healthy:b}"), "{broken:a}/ok");
     EXPECT_TRUE(service_->isActive());
 }
 
@@ -324,7 +322,7 @@ TEST_F(LifecycleTest, ThrottleStateDoesNotAccumulateAcrossRegistrations)
         auto expansion = std::make_shared<FakeExpansion>("demo");
         expansion->throw_from_request = true;
         ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
-        (void)service_->setPlaceholders(nullptr, "{demo.x}");
+        (void)service_->setPlaceholders(nullptr, "{demo:x}");
         ASSERT_TRUE(service_->unregisterExpansion(owner_, "demo"));
     }
 
@@ -356,12 +354,12 @@ TEST_F(LifecycleTest, ProviderReceivesTheOfflinePlayerItWasGiven)
     auto expansion = std::make_shared<FakeExpansion>("player");
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
 
-    (void)service_->setPlaceholders(&alice, "{player.name}");
+    (void)service_->setPlaceholders(&alice, "{player:name}");
     ASSERT_NE(expansion->last_player, nullptr);
     EXPECT_EQ(expansion->last_player->getName(), "Alice");
     EXPECT_EQ(expansion->last_player->getUniqueId(), alice.getUniqueId());
 
-    (void)service_->setPlaceholders(nullptr, "{player.name}");
+    (void)service_->setPlaceholders(nullptr, "{player:name}");
     EXPECT_EQ(expansion->last_player, nullptr);
 }
 
@@ -370,11 +368,11 @@ TEST_F(LifecycleTest, ContainmentCoversExceptionsOnly)
     auto std_thrower = std::make_shared<FakeExpansion>("stdthrow");
     std_thrower->throw_from_request = true;
     ASSERT_TRUE(service_->registerExpansion(owner_, std_thrower));
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{stdthrow.x}"), "{stdthrow.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{stdthrow:x}"), "{stdthrow:x}");
 
     auto non_std = std::make_shared<NonStandardThrowingExpansion>();
     ASSERT_TRUE(service_->registerExpansion(owner_, non_std));
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rogue.x}"), "{rogue.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{rogue:x}"), "{rogue:x}");
 
     EXPECT_TRUE(service_->isActive());
 }

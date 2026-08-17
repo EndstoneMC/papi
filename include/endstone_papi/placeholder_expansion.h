@@ -114,9 +114,9 @@ public:
      *
      * @param player the player the placeholder is being resolved against; may be
      *        null, and may be an offline player that is not currently online
-     * @param params everything after the first dot of the placeholder, preserved
-     *        byte for byte including underscores, case and spaces; empty when the
-     *        placeholder was written as <code>{identifier.}</code>
+     * @param params everything after the first colon of the placeholder, preserved
+     *        byte for byte including underscores, dots, later colons, case and spaces; empty when the
+     *        placeholder was written as <code>{identifier:}</code>
      * @return the replacement value, or nullopt to leave the original
      *         placeholder text untouched
      */
@@ -130,8 +130,8 @@ public:
      *
      * @param one the first player
      * @param two the second player
-     * @param params everything after the first underscore following the identifier
-     *        in the <code>rel.</code> namespace, preserved byte for byte
+     * @param params everything after the second colon in
+     *        <code>{rel:identifier:params}</code>, preserved byte for byte
      * @return the replacement value, or nullopt to leave the original
      *         placeholder text untouched
      */

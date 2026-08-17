@@ -1,6 +1,7 @@
 // Native service behavior, including error containment and thread policy.
 
 #include <thread>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -70,7 +71,7 @@ TEST_F(ServiceTest, ResolvesThroughARegisteredExpansion)
     auto expansion = add("player", owner_);
     expansion->value = "Alex";
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "hello {player.name}!"), "hello Alex!");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "hello {player:name}!"), "hello Alex!");
     EXPECT_EQ(expansion->request_calls, 1);
     EXPECT_EQ(expansion->last_params, "name");
     EXPECT_EQ(expansion->last_player, nullptr);
@@ -81,8 +82,8 @@ TEST_F(ServiceTest, UnknownIdentifiersAndDeclinedValuesStayLiteral)
     auto expansion = add("player", owner_);
     expansion->value = std::nullopt;
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player.x}"), "{player.x}");
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{missing.x}"), "{missing.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player:x}"), "{player:x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{missing:x}"), "{missing:x}");
     EXPECT_EQ(expansion->request_calls, 1);
 }
 
@@ -104,7 +105,7 @@ TEST_F(ServiceTest, ExposesSortedMetadataCopies)
 TEST_F(ServiceTest, ContainsIsPurelyLexical)
 {
     EXPECT_TRUE(service_->containsPlaceholders("{}"));
-    EXPECT_TRUE(service_->containsPlaceholders("{unknown.x}"));
+    EXPECT_TRUE(service_->containsPlaceholders("{unknown:x}"));
     EXPECT_FALSE(service_->containsPlaceholders("}{"));
     EXPECT_FALSE(service_->containsPlaceholders(""));
 }
@@ -156,12 +157,12 @@ TEST_F(ServiceTest, SelfParseCycleIsBounded)
 {
     auto expansion = std::make_shared<FakeExpansion>("a");
     expansion->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
-        return service_->setPlaceholders(nullptr, "{a.x}");
+        return service_->setPlaceholders(nullptr, "{a:x}");
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
 
-    const auto result = service_->setPlaceholders(nullptr, "{a.x}");
-    EXPECT_EQ(result, "{a.x}");
+    const auto result = service_->setPlaceholders(nullptr, "{a:x}");
+    EXPECT_EQ(result, "{a:x}");
     EXPECT_GT(expansion->request_calls, 0);
     EXPECT_TRUE(platform_->logger.anyContains("cycle detected"));
 }
@@ -171,16 +172,16 @@ TEST_F(ServiceTest, IndirectParseCycleIsBounded)
     auto a = std::make_shared<FakeExpansion>("a");
     auto b = std::make_shared<FakeExpansion>("b");
     a->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
-        return service_->setPlaceholders(nullptr, "{b.y}");
+        return service_->setPlaceholders(nullptr, "{b:y}");
     };
     b->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
-        return service_->setPlaceholders(nullptr, "{a.x}");
+        return service_->setPlaceholders(nullptr, "{a:x}");
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, a));
     ASSERT_TRUE(service_->registerExpansion(owner_, b));
 
-    const auto result = service_->setPlaceholders(nullptr, "{a.x}");
-    EXPECT_EQ(result, "{a.x}");
+    const auto result = service_->setPlaceholders(nullptr, "{a:x}");
+    EXPECT_EQ(result, "{a:x}");
     EXPECT_TRUE(platform_->logger.anyContains("cycle detected"));
 }
 
@@ -190,14 +191,14 @@ TEST_F(ServiceTest, NestedParsingAcrossServicesDoesNotAliasManagerLocalGeneratio
     auto outer = std::make_shared<FakeExpansion>("outer");
     auto inner = std::make_shared<FakeExpansion>("inner");
     outer->on_request = [other_service](const endstone::OfflinePlayer *, std::string_view) {
-        return other_service->setPlaceholders(nullptr, "{inner.x}");
+        return other_service->setPlaceholders(nullptr, "{inner:x}");
     };
     inner->value = "leaf";
 
     ASSERT_TRUE(service_->registerExpansion(owner_, outer));
     ASSERT_TRUE(other_service->registerExpansion(owner_, inner));
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{outer.x}"), "leaf");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{outer:x}"), "leaf");
     EXPECT_EQ(outer->request_calls, 1);
     EXPECT_EQ(inner->request_calls, 1);
     EXPECT_FALSE(platform_->logger.anyContains("cycle detected"));
@@ -209,15 +210,15 @@ TEST_F(ServiceTest, ParseDepthBudgetIsEnforced)
     std::vector<std::shared_ptr<FakeExpansion>> chain;
     for (int i = 0; i < chain_length; ++i) {
         auto exp = std::make_shared<FakeExpansion>("e" + std::to_string(i));
-        const auto next_token = (i + 1 < chain_length) ? "{e" + std::to_string(i + 1) + ".x}" : "leaf";
-        exp->on_request = [&, next_token](const endstone::OfflinePlayer *, std::string_view) {
+        auto next_token = (i + 1 < chain_length) ? "{e" + std::to_string(i + 1) + ":x}" : "leaf";
+        exp->on_request = [&, next_token = std::move(next_token)](const endstone::OfflinePlayer *, std::string_view) {
             return service_->setPlaceholders(nullptr, next_token);
         };
         ASSERT_TRUE(service_->registerExpansion(owner_, exp));
         chain.push_back(exp);
     }
 
-    const auto result = service_->setPlaceholders(nullptr, "{e0.x}");
+    const auto result = service_->setPlaceholders(nullptr, "{e0:x}");
     EXPECT_FALSE(result.empty());
     EXPECT_TRUE(platform_->logger.anyContains("parse depth budget exceeded"));
 }
@@ -259,7 +260,7 @@ TEST_F(ServiceTest, ProviderExceptionsArePreservedAsLiteralTokens)
     auto expansion = add("player", owner_);
     expansion->throw_from_request = true;
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "a{player.x}b"), "a{player.x}b");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "a{player:x}b"), "a{player:x}b");
     EXPECT_TRUE(service_->isActive());
     EXPECT_TRUE(platform_->logger.anyContains("player"));
     EXPECT_TRUE(platform_->logger.anyContains("ordinary"));
@@ -274,12 +275,12 @@ TEST_F(ServiceTest, RepeatedProviderFailuresAreThrottled)
     expansion->throw_from_request = true;
 
     for (int i = 0; i < 100; ++i) {
-        (void)service_->setPlaceholders(nullptr, "{player.x}");
+        (void)service_->setPlaceholders(nullptr, "{player:x}");
     }
     EXPECT_EQ(platform_->logger.countAtLeast(endstone::Logger::Error), 1U);
 
     now += ErrorThrottleWindow;
-    (void)service_->setPlaceholders(nullptr, "{player.x}");
+    (void)service_->setPlaceholders(nullptr, "{player:x}");
     EXPECT_EQ(platform_->logger.countAtLeast(endstone::Logger::Error), 2U);
     EXPECT_TRUE(platform_->logger.anyContains("suppressed"));
 }
@@ -289,7 +290,7 @@ TEST_F(ServiceTest, ParsingOffThePrimaryThreadPreservesInputAndDoesNotCallProvid
     auto expansion = add("player", owner_);
     platform_->primary_thread = false;
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player.x}"), "{player.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player:x}"), "{player:x}");
     EXPECT_EQ(expansion->request_calls, 0);
     EXPECT_TRUE(platform_->logger.anyContains("server thread"));
 }
@@ -316,7 +317,7 @@ TEST_F(ServiceTest, PureQueriesAreSafeFromOtherThreads)
     platform_->primary_thread = false;
 
     std::thread worker([&] {
-        EXPECT_TRUE(service_->containsPlaceholders("{demo.x}"));
+        EXPECT_TRUE(service_->containsPlaceholders("{demo:x}"));
         EXPECT_TRUE(service_->isActive());
         EXPECT_TRUE(service_->isRegistered("demo"));
         EXPECT_EQ(service_->getExpansions().size(), 1U);
@@ -328,12 +329,12 @@ TEST_F(ServiceTest, RetainedServiceBecomesInertAfterShutdown)
 {
     auto expansion = add("player", owner_);
     expansion->value = "Alex";
-    ASSERT_EQ(service_->setPlaceholders(nullptr, "{player.x}"), "Alex");
+    ASSERT_EQ(service_->setPlaceholders(nullptr, "{player:x}"), "Alex");
 
     service_->shutdown();
 
     EXPECT_FALSE(service_->isActive());
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player.x}"), "{player.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player:x}"), "{player:x}");
     EXPECT_TRUE(service_->getExpansions().empty());
     EXPECT_TRUE(service_->getRegisteredIdentifiers().empty());
     EXPECT_FALSE(service_->isRegistered("player"));
@@ -344,7 +345,7 @@ TEST_F(ServiceTest, RetainedServiceBecomesInertAfterShutdown)
     EXPECT_FALSE(service_->unregisterExpansion(owner_, "player"));
     EXPECT_EQ(service_->unregisterExpansions(owner_), 0U);
 
-    EXPECT_TRUE(service_->containsPlaceholders("{a.b}"));
+    EXPECT_TRUE(service_->containsPlaceholders("{a:b}"));
 }
 
 TEST_F(ServiceTest, InertServiceNeverReachesTheProviderOrThePlatform)
@@ -356,7 +357,7 @@ TEST_F(ServiceTest, InertServiceNeverReachesTheProviderOrThePlatform)
     const auto logs_after_shutdown = platform_->logger.records.size();
 
     for (int i = 0; i < 10; ++i) {
-        (void)service_->setPlaceholders(nullptr, "{player.x}");
+        (void)service_->setPlaceholders(nullptr, "{player:x}");
         (void)service_->getExpansions();
         (void)service_->isRegistered("player");
     }
@@ -561,12 +562,12 @@ TEST_F(ServiceTest, ExpansionCanUnregisterItselfFromInsideItsCallback)
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
 
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player.x}"), "{player.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player:x}"), "{player:x}");
     EXPECT_FALSE(service_->isRegistered("player"));
     EXPECT_EQ(expansion->unregister_calls, 1);
 
     const auto calls = expansion->request_calls;
-    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player.x}"), "{player.x}");
+    EXPECT_EQ(service_->setPlaceholders(nullptr, "{player:x}"), "{player:x}");
     EXPECT_EQ(expansion->request_calls, calls);
 }
 

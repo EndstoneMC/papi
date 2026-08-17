@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Endstone PAPI is a native C++20 PlaceholderAPI framework for
 [Endstone](https://github.com/EndstoneMC/endstone) and Minecraft Bedrock Dedicated
 Server. It provides a bracket placeholder parser, an owner-aware expansion registry,
-and a service that resolves `{identifier.params}` placeholders through expansions
+and a service that resolves `{identifier:params}` placeholders through expansions
 supplied by C++ or Python plugins.
 
 PAPI is a **framework**, not a placeholder provider. The core contains **no** business
@@ -344,33 +344,38 @@ or Entry           --shared--> GIL-safe proxy --owns-under-GIL--> Python trampol
 
 ### Ordinary syntax
 
-`{identifier.params}` — first dot splits; identifier is ASCII-lowercased;
-params preserve exact case/content, including underscores; no recursion/nesting/regex.
+`{identifier:params}` — first colon splits; identifier is ASCII-lowercased;
+params preserve exact case/content, including underscores, dots, and later colons; no
+recursion/nesting/regex.
 
-- No dot → literal (e.g., `{player}` and `{player_name}` stay unchanged).
+- No colon → literal (e.g., `{player}` and `{player_name}` stay unchanged).
 - Unknown/error/null → original token unchanged.
 - Replacement text is never reparsed.
-- Space before the separator invalidates the token (e.g., `{ player.x}`, `{play er.x}`).
+- Space before the separator invalidates the token (e.g., `{ player:x}`, `{play er:x}`).
 - First closing brace ends the candidate; nesting is not recognized.
 
 ### Relational syntax
 
-`{rel.identifier_params}` — processed only by `setRelationalPlaceholders`. The outer
-parser first splits `rel` from `identifier_params` at the dot; the relational resolver
-then splits `identifier_params` at its first underscore. Only expansions with
+`{rel:identifier:params}` — processed only by `setRelationalPlaceholders`. The generic
+parser first splits `rel` from `identifier:params` at the first colon; the relational
+resolver then splits that remainder at the next colon. Everything after the second
+colon is passed to the expansion unchanged, including underscores, dots, later colons,
+case, spaces, and an empty value. Only expansions with
 `supportsRelationalPlaceholders() == true` are consulted. Ordinary parsing never
-invokes relational callbacks.
+invokes relational callbacks. `rel` is reserved and cannot be registered as an ordinary
+expansion identifier.
 
 ### Contains semantics
 
 `containsPlaceholders(text)` is a cheap lexical check: true when `{` has a later `}`.
-Does not require a dot, valid identifier, or registration. Pure and safe from any
+Does not require a colon, valid identifier, or registration. Pure and safe from any
 thread.
 
 ### Registration grammar
 
-`[A-Za-z0-9][A-Za-z0-9-]*`, canonicalized with ASCII lowercase. Reject dot and
-underscore (syntax/key separators), colon, braces, percent, whitespace, and non-ASCII.
+`[A-Za-z0-9][A-Za-z0-9-]*`, canonicalized with ASCII lowercase. Reject dot,
+underscore, colon, braces, percent, whitespace, and non-ASCII. `rel` is additionally
+reserved by relational syntax.
 
 ## Threading
 
