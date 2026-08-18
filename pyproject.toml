@@ -18,6 +18,7 @@ dynamic = ["version"]
 authors = [
     { name = "Vincent Wu", email = "magicdroidx@gmail.com" },
     { name = "daoge_cmd", email = "3523206925@qq.com" },
+    { name = "ReallocAll", email = "ReallocAll@outlook.com" }
 ]
 description = "PlaceholderAPI framework for Endstone, with C++ and Python expansion providers."
 readme = "README.md"
