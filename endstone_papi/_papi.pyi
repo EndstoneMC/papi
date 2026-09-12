@@ -2,7 +2,7 @@
 
 import enum
 
-from endstone import OfflinePlayer, Player
+from endstone import Player
 from endstone.event import Event
 from endstone.plugin import Plugin, Service, ServiceManager
 
@@ -82,7 +82,7 @@ class PlaceholderExpansion:
         """The identifier this expansion answers to.
 
         Must match ``[A-Za-z0-9][A-Za-z0-9-]*``, and is canonicalized to lowercase.
-        Dot separates the identifier from parameters; underscore belongs to parameters.
+        The first colon separates the identifier from parameters; underscore belongs to parameters.
         Neither is allowed in an identifier.
         """
 
@@ -115,9 +115,10 @@ class PlaceholderExpansion:
     def supports_player_cleanup(self) -> bool:
         """Whether ``on_player_quit`` is implemented. Defaults to False."""
 
-    def on_request(self, player: OfflinePlayer | None, params: str) -> str | None:
+    def on_request(self, player: Player | None, params: str) -> str | None:
         """Resolves an ordinary ``{identifier:params}`` placeholder.
 
+        ``player`` is an online ``Player`` or None and is borrowed for this call only.
         ``params`` contains everything after the first colon exactly as written.
         Return a ``str``, or None to leave the placeholder text untouched. Any other
         type is a provider error and is not coerced.
@@ -126,11 +127,15 @@ class PlaceholderExpansion:
     def on_relational_request(self, one: Player, two: Player, params: str) -> str | None:
         """Resolves a relational ``{rel:identifier:params}`` placeholder.
 
+        ``one`` and ``two`` are borrowed for this call only; do not retain them.
         ``params`` contains everything after the second colon exactly as written.
         """
 
     def on_player_quit(self, player: Player) -> None:
-        """Called when a player leaves, if this expansion opted into cleanup."""
+        """Called when a player leaves, if this expansion opted into cleanup.
+
+        ``player`` is borrowed for this call only; do not retain it.
+        """
 
     def on_unregister(self, reason: UnregisterReason) -> None:
         """Called once after this expansion has been removed from the registry."""
@@ -156,8 +161,11 @@ class PlaceholderAPI(Service):
     def active(self) -> bool:
         """Whether this service is still usable."""
 
-    def set_placeholders(self, player: OfflinePlayer | None, text: str) -> str:
-        """Replaces every resolvable ``{identifier:params}`` in text."""
+    def set_placeholders(self, player: Player | None, text: str) -> str:
+        """Replaces every resolvable ``{identifier:params}`` in text.
+
+        ``player`` is an online ``Player`` or None and is borrowed for this call only.
+        """
 
     def set_relational_placeholders(self, one: Player, two: Player, text: str) -> str:
         """Replaces every resolvable ``{rel:identifier:params}`` in text."""
@@ -189,18 +197,18 @@ class PlaceholderAPI(Service):
         """Unregisters every expansion owned by a plugin."""
 
 class ExpansionRegisteredEvent(Event):
-    """Fired after an expansion has been added to the registry."""
+    """Fired after registration. The event is borrowed for the callback only."""
 
     @property
     def expansion_info(self) -> ExpansionInfo:
-        """Metadata describing the expansion that was registered."""
+        """An independent metadata snapshot, safe to retain after the callback."""
 
 class ExpansionUnregisteredEvent(Event):
-    """Fired after an expansion has been removed from the registry."""
+    """Fired after removal. The event is borrowed for the callback only."""
 
     @property
     def expansion_info(self) -> ExpansionInfo:
-        """Metadata describing the expansion that was removed."""
+        """An independent metadata snapshot, safe to retain after the callback."""
 
     @property
     def reason(self) -> UnregisterReason:

@@ -46,7 +46,7 @@ void PapiBootstrap::registerListeners(endstone::Plugin &plugin)
         endstone::EventPriority::Normal, false);
 
     plugin.registerEvent<endstone::PlayerQuitEvent>(
-        [service](endstone::PlayerQuitEvent &event) { service->handlePlayerQuit(event.getPlayer()); },
+        [service](endstone::PlayerQuitEvent &event) { service->handlePlayerQuit(*event.getPlayer()); },
         endstone::EventPriority::Normal, false);
 }
 
@@ -61,7 +61,7 @@ void PapiBootstrap::stop()
 
     if (plugin_) {
         auto &service_manager = plugin_->getServer().getServiceManager();
-        service_manager.unregister(std::string(PlaceholderAPI::ServiceName), *service_);
+        service_manager.unregister(std::string(PlaceholderAPI::ServiceName), service_);
         ServicePublication::withdraw(service_manager, *service_);
         service_manager.unregisterAll(*plugin_);
     }

@@ -40,7 +40,7 @@ TEST_F(EventsTest, RegisteredEventFiresAfterCommit)
 {
     bool saw_registered = false;
     platform_->on_event = [&](const papi::testing::RecordedEvent &event) {
-        if (event.name == "ExpansionRegisteredEvent") {
+        if (event.name == "endstone_papi.ExpansionRegisteredEvent") {
             saw_registered = true;
             // The registry must already reflect the commit, so the new expansion is
             // visible while the event is being dispatched.
@@ -62,7 +62,7 @@ TEST_F(EventsTest, UnregisteredEventFiresAfterRemoval)
 
     bool saw_unregistered = false;
     platform_->on_event = [&](const papi::testing::RecordedEvent &event) {
-        if (event.name == "ExpansionUnregisteredEvent") {
+        if (event.name == "endstone_papi.ExpansionUnregisteredEvent") {
             saw_unregistered = true;
             // Removed before the event, so a listener querying the registry no longer
             // observes the expansion.
@@ -99,7 +99,7 @@ TEST_F(EventsTest, ThrowingCleanupDoesNotStopTheUnregisteredEvent)
     // The event still fires after a throwing cleanup, because the removal is committed
     // before cleanup runs and its failure is contained.
     ASSERT_EQ(platform_->events.size(), 1U);
-    EXPECT_EQ(platform_->events[0].name, "ExpansionUnregisteredEvent");
+    EXPECT_EQ(platform_->events[0].name, "endstone_papi.ExpansionUnregisteredEvent");
     EXPECT_EQ(platform_->events[0].reason, papi::UnregisterReason::Explicit);
 }
 
@@ -168,7 +168,7 @@ TEST_F(EventsTest, EventsCarryCopiedMetadataOnly)
 
     ASSERT_EQ(platform_->events.size(), 1U);
     const auto &event = platform_->events.back();
-    EXPECT_EQ(event.name, "ExpansionRegisteredEvent");
+    EXPECT_EQ(event.name, "endstone_papi.ExpansionRegisteredEvent");
     ASSERT_TRUE(event.info.has_value());
     EXPECT_EQ(event.info.value().identifier, "demo");
     EXPECT_EQ(event.info.value().author, "Endstone");

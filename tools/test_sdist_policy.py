@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import tempfile
 import types
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -49,11 +50,15 @@ def _assert_isolated_sdist_flow(source: str) -> None:
     assert "--compare" in source
     assert "--auditwheel" in source
     assert "export PATH=/opt/python/cp312-cp312/bin:$PATH" in source
-    assert '"endstone==0.11.8"' in source
+    assert "endstone==0.11.11.dev392" in source
+    assert "tools/prepare_endstone_wheels.py" in source
+    assert "cp -R .endstone-wheelhouse /tmp/papi-sdist-build/.endstone-wheelhouse" in source
     assert 'ldd "$module"' in source
     assert "native import unexpectedly succeeded without Endstone libc++" in source
     assert "assert not any('=> /usr/' in line for line in runtime)" in source
-    assert "/tmp/papi-sdist-smoke-env/bin/pip install endstone==0.11.8" not in source
+    assert '/tmp/papi-sdist-smoke-env/bin/pip install "$ENDSTONE_REQUIREMENT"' in source
+    assert "--no-deps" not in source
+    assert "/tmp/papi-sdist-smoke-env/bin/pip check" in source
 
 
 def _fake_delegate_wheel(wheel_directory: str, *_args: object) -> str:
@@ -145,6 +150,52 @@ def test_filename_and_wheel_metadata_platform_parsing() -> None:
     assert verify_linux_wheel._filename_platforms(wheel) == {"manylinux_2_31_x86_64"}
     metadata = "Wheel-Version: 1.0\nTag: cp312-cp312-manylinux_2_31_x86_64\n"
     assert verify_linux_wheel._wheel_metadata_platforms(metadata) == {"manylinux_2_31_x86_64"}
+
+
+def test_missing_unwind_bridge_is_rejected() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        wheel = Path(temporary) / "endstone_papi-1.0.0-cp312-cp312-manylinux_2_31_x86_64.whl"
+        files = {
+            "endstone_papi/_papi.so": b"module",
+            "endstone_papi/libc++.so.1": b"bridge",
+            "endstone_papi/libc++abi.so.1": b"bridge",
+            "endstone_papi-1.0.0.dist-info/METADATA": b"Requires-Dist: endstone==0.11.11.dev392\n",
+            "endstone_papi-1.0.0.dist-info/WHEEL": b"Tag: cp312-cp312-manylinux_2_31_x86_64\n",
+        }
+        files["endstone_papi-1.0.0.dist-info/RECORD"] = "".join(f"{name},,\n" for name in files).encode()
+        with zipfile.ZipFile(wheel, "w") as archive:
+            for name, content in files.items():
+                archive.writestr(name, content)
+        try:
+            verify_linux_wheel.inspect_wheel(wheel)
+        except AssertionError as error:
+            assert "libunwind.so.1 missing" in str(error)
+        else:
+            raise AssertionError("missing LLVM unwinder bridge was accepted")
+
+
+def test_gcc_imports_allow_only_required_arithmetic() -> None:
+    validate = verify_linux_wheel._validate_gcc_imports
+    arithmetic = (("libgcc_s.so.1", "__udivti3", "GCC_3.0"), ("libgcc_s.so.1", "__umodti3", "GCC_3.0"))
+    validate((), ())
+    validate(("libgcc_s.so.1",), arithmetic)
+    validate(("libgcc_s.so.1",), arithmetic[:1])
+    rejected = [
+        (("libgcc_s.so.1",), ()),
+        ((), arithmetic),
+        (("libgcc_s.so.1",), (("libgcc_s.so.1", "_Unwind_Resume", "GCC_3.0"),)),
+        (("libgcc_s.so.1",), (("libgcc_s.so.1", "__gcc_personality_v0", "GCC_3.3.1"),)),
+        (("libgcc_s.so.1",), (("libgcc_s.so.1", "__divti3", "GCC_3.0"),)),
+        (("libgcc_s.so.1",), (("libgcc_s.so.1", "__udivti3", "GCC_4.0"),)),
+        (("libgcc_s.so.1",), (("other.so", "__udivti3", "GCC_3.0"),)),
+    ]
+    for dependencies, imports in rejected:
+        try:
+            validate(dependencies, imports)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError(f"invalid GCC dependency accepted: {dependencies}, {imports}")
 
 
 def test_ci_builds_and_smokes_only_the_copied_archive() -> None:

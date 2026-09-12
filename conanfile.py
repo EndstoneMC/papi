@@ -4,6 +4,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.scm import Version
 
 
 class PapiRecipe(ConanFile):
@@ -31,10 +32,10 @@ class PapiRecipe(ConanFile):
         cmake_layout(self)
 
     def requirements(self):
-        # Matches Endstone 0.11's own pin so the fetched Endstone headers resolve
+        # Matches Endstone 0.12's own pin so the fetched Endstone headers resolve
         # find_package(expected-lite) instead of downloading a second copy.
         self.requires("expected-lite/0.9.0")
-        # Endstone 0.11 builds its bindings against pybind11 3.x; the expansion
+        # Endstone 0.12 builds its bindings against pybind11 3.x; the expansion
         # trampoline needs py::smart_holder and py::trampoline_self_life_support.
         # Pinned to 3.0.1 to match the PEP 517 pybind11==3.0.1 in pyproject.toml;
         # the Conan package provides the CMake headers (find_package(pybind11)).
@@ -59,9 +60,9 @@ class PapiRecipe(ConanFile):
         if self.settings.os == "Linux" and self.settings.compiler.libcxx != "libc++":
             raise ConanInvalidConfiguration(f"{self.ref} requires libc++ on Linux for Endstone ABI compatibility.")
 
-        if self.settings.os == "Linux" and str(self.settings.compiler.version) != "20":
+        if self.settings.os == "Linux" and Version(str(self.settings.compiler.version)) < "18":
             raise ConanInvalidConfiguration(
-                f"{self.ref} requires Clang 20 on Linux for Endstone ABI compatibility, "
+                f"{self.ref} requires Clang 18 or newer on Linux for Endstone ABI compatibility, "
                 f"not Clang {self.settings.compiler.version}."
             )
 

@@ -46,7 +46,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "author"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *, const std::string_view) override
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *, const std::string_view) override
     {
         EXPECT_TRUE(module_loaded_) << "onRequest called after its module was unloaded";
         return "value";
@@ -72,7 +72,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "author"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *, const std::string_view) override
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *, const std::string_view) override
     {
         throw 42;
     }
@@ -202,7 +202,7 @@ TEST_F(LifecycleTest, MetadataQueriesCompleteWhileAProviderCallbackIsBlocked)
     std::atomic<bool> may_return{false};
 
     auto expansion = std::make_shared<FakeExpansion>("slow");
-    expansion->on_request = [&](const endstone::OfflinePlayer *, std::string_view) -> std::optional<std::string> {
+    expansion->on_request = [&](const endstone::Player *, std::string_view) -> std::optional<std::string> {
         inside_callback.store(true, std::memory_order_release);
         while (!may_return.load(std::memory_order_acquire)) {
             std::this_thread::yield();
@@ -232,7 +232,7 @@ TEST_F(LifecycleTest, UnregisterIsVisibleImmediatelyEvenWhileACallbackRuns)
     std::atomic<bool> may_return{false};
 
     auto expansion = std::make_shared<FakeExpansion>("slow");
-    expansion->on_request = [&](const endstone::OfflinePlayer *, std::string_view) -> std::optional<std::string> {
+    expansion->on_request = [&](const endstone::Player *, std::string_view) -> std::optional<std::string> {
         inside_callback.store(true, std::memory_order_release);
         while (!may_return.load(std::memory_order_acquire)) {
             std::this_thread::yield();
@@ -262,7 +262,7 @@ TEST_F(LifecycleTest, UnregisterEventFiresAfterDeferredCleanup)
     std::atomic<bool> may_return{false};
 
     auto expansion = std::make_shared<FakeExpansion>("slow");
-    expansion->on_request = [&](const endstone::OfflinePlayer *, std::string_view) -> std::optional<std::string> {
+    expansion->on_request = [&](const endstone::Player *, std::string_view) -> std::optional<std::string> {
         inside_callback.store(true, std::memory_order_release);
         while (!may_return.load(std::memory_order_acquire)) {
             std::this_thread::yield();
@@ -287,7 +287,7 @@ TEST_F(LifecycleTest, UnregisterEventFiresAfterDeferredCleanup)
 
     EXPECT_EQ(expansion->unregister_calls, 1);
     ASSERT_EQ(platform_->events.size(), 1U);
-    EXPECT_EQ(platform_->events[0].name, "ExpansionUnregisteredEvent");
+    EXPECT_EQ(platform_->events[0].name, "endstone_papi.ExpansionUnregisteredEvent");
     EXPECT_EQ(platform_->events[0].reason, UnregisterReason::Explicit);
 }
 
@@ -348,7 +348,7 @@ TEST_F(LifecycleTest, PlayerCleanupUsesRealPlayerIdentity)
     EXPECT_EQ(expansion->last_quit_player, &bob);
 }
 
-TEST_F(LifecycleTest, ProviderReceivesTheOfflinePlayerItWasGiven)
+TEST_F(LifecycleTest, ProviderReceivesThePlayerItWasGiven)
 {
     FakePlayer alice{"Alice", endstone::UUID{{1}}};
     auto expansion = std::make_shared<FakeExpansion>("player");

@@ -1,0 +1,50 @@
+name: Stage Endstone wheelhouse
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    environment: endstone-artifacts
+    steps:
+      - name: Checkout trusted source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Prepare verified Endstone runtime wheels
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.ENDSTONE_ARTIFACTS_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::Configure ENDSTONE_ARTIFACTS_TOKEN in the main-only endstone-artifacts environment with Actions:read access to EndstoneMC/endstone"
+            exit 1
+          fi
+          python tools/prepare_endstone_wheels.py --output-dir .endstone-wheelhouse
+
+      - name: Upload verified wheelhouse
+        uses: actions/upload-artifact@v4
+        with:
+          name: endstone-v012-e7eab922-wheelhouse
+          path: .endstone-wheelhouse/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Report staging run
+        shell: bash
+        run: |
+          echo "Set repository variable ENDSTONE_WHEELHOUSE_RUN_ID to $GITHUB_RUN_ID after this run succeeds." >> "$GITHUB_STEP_SUMMARY"

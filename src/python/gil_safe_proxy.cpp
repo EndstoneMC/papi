@@ -171,7 +171,7 @@ bool GilSafeExpansionProxy::supportsPlayerCleanup() const
     }
 }
 
-std::optional<std::string> GilSafeExpansionProxy::onRequest(const endstone::OfflinePlayer *player,
+std::optional<std::string> GilSafeExpansionProxy::onRequest(const endstone::Player *player,
                                                             const std::string_view params)
 {
     const py::gil_scoped_acquire gil;

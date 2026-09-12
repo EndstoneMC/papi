@@ -29,8 +29,7 @@ public:
 
     // PlaceholderAPI
     [[nodiscard]] bool isActive() const noexcept override;
-    [[nodiscard]] std::string setPlaceholders(const endstone::OfflinePlayer *player,
-                                              std::string_view text) const override;
+    [[nodiscard]] std::string setPlaceholders(const endstone::Player *player, std::string_view text) const override;
     [[nodiscard]] std::string setRelationalPlaceholders(const endstone::Player &one, const endstone::Player &two,
                                                         std::string_view text) const override;
     [[nodiscard]] bool containsPlaceholders(std::string_view text) const noexcept override;

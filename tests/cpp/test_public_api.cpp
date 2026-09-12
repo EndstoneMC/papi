@@ -94,7 +94,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "author"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *player,
                                                        const std::string_view params) override
     {
         last_player_was_null = player == nullptr;
@@ -154,13 +154,15 @@ TEST(Events, CarryOnlyCopiedMetadata)
 
     const papi::ExpansionRegisteredEvent registered{info};
     EXPECT_EQ(registered.getExpansionInfo(), info);
-    EXPECT_EQ(registered.getEventName(), "ExpansionRegisteredEvent");
+    EXPECT_EQ(registered.getEventName(), "endstone_papi.ExpansionRegisteredEvent");
+    EXPECT_EQ(registered.getEventName(), papi::ExpansionRegisteredEvent::NAME);
     EXPECT_FALSE(registered.isAsynchronous());
 
     const papi::ExpansionUnregisteredEvent unregistered{info, papi::UnregisterReason::OwnerDisabled};
     EXPECT_EQ(unregistered.getExpansionInfo(), info);
     EXPECT_EQ(unregistered.getReason(), papi::UnregisterReason::OwnerDisabled);
-    EXPECT_EQ(unregistered.getEventName(), "ExpansionUnregisteredEvent");
+    EXPECT_EQ(unregistered.getEventName(), "endstone_papi.ExpansionUnregisteredEvent");
+    EXPECT_EQ(unregistered.getEventName(), papi::ExpansionUnregisteredEvent::NAME);
     EXPECT_FALSE(unregistered.isAsynchronous());
 }
 

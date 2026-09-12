@@ -204,7 +204,7 @@ public:
     [[nodiscard]] bool supportsRelationalPlaceholders() const override { return relational; }
     [[nodiscard]] bool supportsPlayerCleanup() const override { return player_cleanup; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *player,
                                                        const std::string_view params) override
     {
         ++request_calls;
@@ -272,7 +272,7 @@ public:
     bool throw_from_player_quit = false;
     bool throw_from_unregister = false;
 
-    std::function<std::optional<std::string>(const endstone::OfflinePlayer *, std::string_view)> on_request;
+    std::function<std::optional<std::string>(const endstone::Player *, std::string_view)> on_request;
     std::function<void(UnregisterReason)> on_unregister;
 
     mutable int identifier_calls = 0;
@@ -282,7 +282,7 @@ public:
     int player_quit_calls = 0;
     int unregister_calls = 0;
 
-    const endstone::OfflinePlayer *last_player = nullptr;
+    const endstone::Player *last_player = nullptr;
     const endstone::Player *last_relational_one = nullptr;
     const endstone::Player *last_relational_two = nullptr;
     const endstone::Player *last_quit_player = nullptr;
@@ -313,7 +313,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "author"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *, std::string_view) override
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *, std::string_view) override
     {
         return "value";
     }
