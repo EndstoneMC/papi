@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Endstone `0.11.11.dev392` wheels (API 0.12, build `33562961160`). Snapshot installs
   require the supplied wheelhouse; production releases remain blocked until a
   supported stable runtime is selected.
+- Linux developer wheel repair now accepts Clang 18 or newer while official wheels remain pinned to Clang 20.
 
 ### Changed
 

@@ -181,34 +181,81 @@ def test_wheel_validation_requires_compiler_provenance() -> None:
 
     repair = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")
     assert 'os.environ.get("CC", "clang")' in repair
-    assert 'r"\\bclang version 20\\."' in repair
+    assert 'r"\\bclang version (\\d+)(?:\\.|\\s|$)"' in repair
+    assert "int(clang_match.group(1)) < 18" in repair
 
 
-def test_repair_accepts_vendor_prefixed_clang_20_and_rejects_other_majors() -> None:
+def test_repair_accepts_clang_18_or_newer_and_reaches_auditwheel() -> None:
     versions = [
-        ("clang version 20.1.8", False),
-        ("Ubuntu clang version 20.1.8 (++vendor)", False),
-        ("Ubuntu clang version 19.1.7", True),
-        ("Ubuntu clang version 200.0.0", True),
+        "clang version 18.1.8",
+        "Ubuntu clang version 19.1.7 (++vendor)",
+        "clang version 20.1.8",
+        "Ubuntu clang version 21.0.0 (++vendor)",
+        "clang version 200.0.0",
     ]
 
-    for version, rejected in versions:
+    for version in versions:
         with (
             TemporaryDirectory() as temporary_directory,
-            mock.patch.object(repair_wheel.shutil, "which", return_value="/usr/bin/clang-20"),
+            mock.patch.object(repair_wheel, "_find_backend_tool", return_value="/usr/bin/patchelf"),
+            mock.patch.object(repair_wheel.shutil, "which", return_value="/usr/bin/clang"),
             mock.patch.object(repair_wheel.subprocess, "check_output", return_value=f"{version}\n"),
-            mock.patch.object(repair_wheel.subprocess, "check_call", side_effect=RuntimeError("accepted")),
+            mock.patch.object(
+                repair_wheel.subprocess, "check_call", side_effect=RuntimeError("accepted")
+            ) as check_call,
+        ):
+            try:
+                repair_wheel.repair_wheel(Path("input.whl"), Path(temporary_directory) / "output")
+            except RuntimeError as error:
+                assert str(error) == "accepted"
+            else:
+                raise AssertionError(f"repair did not reach auditwheel for {version!r}")
+        assert check_call.call_args.args[0][:4] == [sys.executable, "-m", "auditwheel", "repair"]
+
+
+def test_repair_rejects_invalid_compilers_before_auditwheel() -> None:
+    versions = [
+        "clang version 17.0.6",
+        "gcc (Ubuntu 13.2.0) 13.2.0",
+        "clang version",
+        "clang 18.1.8",
+        "",
+    ]
+
+    for version in versions:
+        with (
+            TemporaryDirectory() as temporary_directory,
+            mock.patch.object(repair_wheel, "_find_backend_tool", return_value="/usr/bin/patchelf"),
+            mock.patch.object(repair_wheel.shutil, "which", return_value="/usr/bin/clang"),
+            mock.patch.object(repair_wheel.subprocess, "check_output", return_value=f"{version}\n"),
+            mock.patch.object(repair_wheel.subprocess, "check_call") as check_call,
         ):
             try:
                 repair_wheel.repair_wheel(Path("input.whl"), Path(temporary_directory) / "output")
             except SystemExit as error:
-                if not rejected:
-                    raise AssertionError(f"unexpected rejection for {version!r}: {error}") from error
-            except RuntimeError as error:
-                if rejected or str(error) != "accepted":
-                    raise
+                assert "Clang 18 or newer is required" in str(error)
             else:
-                raise AssertionError("repair test did not reach a terminal result")
+                raise AssertionError(f"invalid compiler accepted: {version!r}")
+            check_call.assert_not_called()
+
+
+def test_repair_rejects_missing_compiler_before_version_check() -> None:
+    with (
+        TemporaryDirectory() as temporary_directory,
+        mock.patch.dict(repair_wheel.os.environ, {"CC": "clang"}),
+        mock.patch.object(repair_wheel, "_find_backend_tool", return_value="/usr/bin/patchelf"),
+        mock.patch.object(repair_wheel.shutil, "which", return_value=None),
+        mock.patch.object(repair_wheel.subprocess, "check_output") as check_output,
+        mock.patch.object(repair_wheel.subprocess, "check_call") as check_call,
+    ):
+        try:
+            repair_wheel.repair_wheel(Path("input.whl"), Path(temporary_directory) / "output")
+        except SystemExit as error:
+            assert "compiler 'clang' not found" in str(error)
+        else:
+            raise AssertionError("missing compiler was accepted")
+        check_output.assert_not_called()
+        check_call.assert_not_called()
 
 
 def test_repair_uses_backend_interpreter_and_finds_adjacent_tools() -> None:
