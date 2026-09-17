@@ -95,7 +95,7 @@ before-build = "pip install ninja wheel endstone==0.11.11"
 repair-wheel-command = ""
 before-all = [
     "apt-get update -y -q && apt-get install -y -q build-essential lsb-release wget software-properties-common gnupg python3-pip xz-utils",
-    "for attempt in 1 2 3; do if wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 20; then break; fi; status=$?; if [ \"$attempt\" -eq 3 ]; then exit \"$status\"; fi; if [ \"$attempt\" -eq 1 ]; then sleep 5; else sleep 15; fi; done",
+    "for attempt in 1 2 3; do if wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 20; then break; else status=$?; fi; if [ \"$attempt\" -eq 3 ]; then exit \"$status\"; fi; if [ \"$attempt\" -eq 1 ]; then sleep 5; else sleep 15; fi; done",
     "apt-get install -y -q clang-tools-20",
     "python3 -m pip install 'cmake==3.31.6' 'ninja==1.11.1.4'",
     "/usr/bin/clang-20 --version | tee /tmp/toolchain-provenance.txt",

@@ -82,16 +82,16 @@ def test_linux_runtime_bootstrap_retries_transient_download_failures() -> None:
         installer = root / "installer.sh"
         wget = root / "wget"
         llvm_script = root / "llvm.sh"
-        installer.write_text(
+        installer.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        wget.write_text(
             f'#!/bin/sh\nattempt=$(cat "{state}" 2>/dev/null || printf 0)\nattempt=$((attempt + 1))\n'
             f'printf "%s" "$attempt" > "{state}"\n'
-            'if [ "$attempt" -le "${FAILURES:-0}" ]; then exit 9; fi\n',
+            'if [ "$attempt" -le "${FAILURES:-0}" ]; then exit 9; fi\n'
+            f'cp "{installer}" "$2"\n',
             encoding="utf-8",
         )
-        wget.write_text(f'#!/bin/sh\ncp "{installer}" "$2"\n', encoding="utf-8")
-        for path in (installer, wget):
-            path.chmod(0o755)
-        command = retry.replace("wget", str(wget), 1).replace("/tmp/llvm.sh", str(llvm_script), 1)
+        wget.chmod(0o755)
+        command = retry.replace("wget", str(wget), 1).replace("/tmp/llvm.sh", str(llvm_script))
         command = command.replace("sleep 5", ":").replace("sleep 15", ":")
 
         transient = subprocess.run(
