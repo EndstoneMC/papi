@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-17
+
 ### Fixed
 
 - Linux wheels now target Endstone's `manylinux_2_31` baseline and reject packaging when generated binaries require a newer baseline.
@@ -48,3 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING**: Removed 0.0.1 compatibility adapters: `PlaceholderAPI::Processor`,
   `registerPlaceholder`, `getPlaceholderPattern`, Python `register_placeholder`,
   and `placeholder_pattern`.
+
+[Unreleased]: https://github.com/EndstoneMC/papi/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/EndstoneMC/papi/releases/tag/v0.1.0
