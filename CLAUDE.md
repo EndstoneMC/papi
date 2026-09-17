@@ -15,10 +15,10 @@ placeholders—no player name, ping, coordinates, online count, time, economy,
 permissions, prefix, or similar values. Every value comes from a PlaceholderExpansion
 registered by a plugin.
 
-Architecture B is frozen: the native C++ core owns the parser, registry, service,
-lifecycle, ownership, relational dispatch, and error containment. Python is a consumer,
-a PlaceholderExpansion provider, and the binding/package layer. Python must never
-become the PlaceholderAPI core.
+The native C++ core owns the parser, registry, service, lifecycle, ownership,
+relational dispatch, and error containment. Python is a consumer, a
+PlaceholderExpansion provider, and the binding/package layer. Keep core ownership
+in native code rather than duplicating it in Python.
 
 ## Build Commands
 
@@ -284,11 +284,10 @@ All four paths share one native registry:
 ### Trampoline dispatch safety
 
 The trampoline resolves overridden members by walking the Python type's MRO **above**
-the pybind base class. A plain `hasattr` or `self.attr(name)` on the instance re-enters
-the base binding's property or method, which dispatches back into the trampoline,
-causing unbounded native↔Python recursion. This was a real incident that consumed 18 GB
-of RAM in seconds. The regression is covered by tests that assert bounded behavior via a
-lowered recursion limit and exact dispatch counts.
+the pybind base class. Instance-level lookup re-enters the base binding and dispatches
+back into the trampoline, causing unbounded native↔Python recursion. Keep override
+resolution at the type/MRO level; regression tests assert bounded behavior and exact
+dispatch counts.
 
 ### GIL rules
 
@@ -421,7 +420,9 @@ reserved by relational syntax.
 
 ### ABI
 
-- Tied to Endstone `0.11.11` (API 0.11), C++20, target architecture, standard library, compiler runtime,
+- Official builds use Endstone `0.11.11` (API 0.11) as the C++ build baseline; package runtime support is
+  `endstone>=0.11.8,<0.12`.
+- Native ABI compatibility also depends on C++20, target architecture, standard library, compiler runtime,
   and Python minor wheel.
 - C++ providers must use a toolchain compatible with the running Endstone/PAPI build.
 - Implementation/private locks/maps/pybind types must not leak into public headers.

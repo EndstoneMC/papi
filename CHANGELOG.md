@@ -9,18 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Linux wheels now advertise Endstone's `manylinux_2_31` baseline and fail packaging when their ELF requirements exceed it.
-- `/papi` subcommands now use explicit command enum names, preventing duplicate enum registration while preserving both
-  parse forms and multi-word text.
-- Python consumers can now load a correctly typed `PlaceholderAPI` from
-  Endstone's service manager without relying on unavailable cross-module RTTI
-  downcasting or trusting an arbitrary provider with the same service name.
-- Linux wheels establish their Endstone-owned C++ runtime-family dependency with
-  standard-SONAME bridge DSOs, avoiding direct hashed-SONAME loader crashes and
-  import-time mutation of the installed package directory.
-- `endstone>=0.11.8,<0.12` is declared as the runtime dependency, while
-  build and CI environments remain pinned to Endstone 0.11.11.
-- Linux developer wheel repair now accepts Clang 18 or newer while official wheels remain pinned to Clang 20.
+- Linux wheels now target Endstone's `manylinux_2_31` baseline and reject packaging when generated binaries require a newer baseline.
+- `/papi` parse commands now register reliably while preserving both supported parse forms and multi-word text.
+- Python plugins can reliably load the active `PlaceholderAPI` service through Endstone's service manager.
+- Fixed Linux wheel loading with Endstone's bundled C++ runtime.
+- PAPI now declares support for Endstone `>=0.11.8,<0.12` (API 0.11).
+- Linux source builds support Clang 18 or newer; official wheels are built with Clang 20.
 
 ### Changed
 
@@ -34,34 +28,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Native C++20 PlaceholderAPI framework with bracket parser, owner-aware
-  expansion registry, and inert retained-service lifecycle
-- `PlaceholderExpansion` contract for C++ and Python providers, sharing one
-  native registry
-- `{identifier:params}` ordinary placeholder syntax with first-colon split,
-  ASCII-lowercase identifier, and exact parameter preservation
-- `{rel:identifier:params}` relational placeholder dispatch with explicit
-  capability declaration and two-player API
-- GIL-safe Python expansion bridge using pybind11 3 `smart_holder` and
-  `trampoline_self_life_support`
-- `/papi parse`, `/papi list`, and `/papi info` commands with permission checks
-  and input validation
-- `ExpansionRegisteredEvent` and `ExpansionUnregisteredEvent` metadata-only
-  post-commit events
-- Bounded 60-second error throttling with injectable monotonic clock
-- Strict ASCII identifier grammar `[A-Za-z0-9][A-Za-z0-9-]*`
-- Windows and Linux CI with clang-cl/Clang 20, Conan 2, CMake 3.29, and
-  CPython 3.10–3.14 wheel matrix
-- Architecture boundary enforcement via automated tests
-- Deterministic changelog and release-note tooling
-- Automated release workflow with dry-run mode
+- Native C++20 PlaceholderAPI framework with a bracket parser, owner-aware expansion lifecycle, and shared service.
+- A common `PlaceholderExpansion` contract for C++ and Python providers.
+- `{identifier:params}` ordinary placeholder syntax with first-colon splitting and exact parameter preservation.
+- `{rel:identifier:params}` relational placeholder dispatch with explicit provider opt-in.
+- Python expansions can be registered, retained, and invoked through the same native service as C++ expansions.
+- `/papi parse`, `/papi list`, and `/papi info` commands with permission checks and input validation.
+- `ExpansionRegisteredEvent` and `ExpansionUnregisteredEvent` for expansion lifecycle changes.
+- Repeated expansion errors are rate-limited to prevent log spam.
+- Strict ASCII identifier grammar `[A-Za-z0-9][A-Za-z0-9-]*`.
+- Windows and Linux wheels for CPython 3.10–3.14.
 
 ### Removed
 
-- **BREAKING**: Python `PlaceholderAPI` constructor and subclassing (Architecture A)
-- **BREAKING**: Python registry, pipe parser, and all built-in placeholders
-- **BREAKING**: `{identifier|params}` pipe syntax
-- **BREAKING**: `plugin:identifier` duplicate-namespace fallback
-- **BREAKING**: 0.0.1 compatibility adapters `PlaceholderAPI::Processor`,
+- **BREAKING**: Python plugins must load `PlaceholderAPI` from Endstone's service manager; direct construction and subclassing are no longer supported.
+- **BREAKING**: Removed the 0.0.1 Python-only registry, parser, and built-in placeholders.
+- **BREAKING**: Removed the `{identifier|params}` pipe syntax.
+- **BREAKING**: Removed the `plugin:identifier` duplicate-namespace fallback.
+- **BREAKING**: Removed 0.0.1 compatibility adapters: `PlaceholderAPI::Processor`,
   `registerPlaceholder`, `getPlaceholderPattern`, Python `register_placeholder`,
-  and `placeholder_pattern`
+  and `placeholder_pattern`.

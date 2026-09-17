@@ -1,4 +1,4 @@
-# Placeholder API for Endstone
+# PlaceholderAPI for Endstone
 
 A PlaceholderAPI framework for [Endstone](https://github.com/EndstoneMC/endstone),
 inspired by the PlaceholderAPI plugin for Spigot. C++ and Python plugins are equal
@@ -20,13 +20,13 @@ ASCII-lowercased and matched case-insensitively; the parameters are passed to th
 expansion exactly as written, including underscores, dots, later colons, case, spaces,
 and an empty value.
 
-| Input                      | Identifier | Params             | Notes                                   |
-| -------------------------- | ---------- | ------------------ | --------------------------------------- |
-| `{player:name}`          | `player` | `name`           | the ordinary form                       |
-| `{PLAYER:NaMe}`          | `player` | `NaMe`           | identifier lowercased, params preserved |
-| `{spark:cpu_process_1m}` | `spark`  | `cpu_process_1m` | underscores belong to params            |
-| `{player:}`              | `player` | *(empty)*        | dispatched with empty params            |
-| `{player}`               | —         | —                 | no colon, so it stays literal           |
+| Input                    | Identifier | Params           | Notes                                   |
+| ------------------------ | ---------- | ---------------- | --------------------------------------- |
+| `{player:name}`          | `player`   | `name`           | the ordinary form                       |
+| `{PLAYER:NaMe}`          | `player`   | `NaMe`           | identifier lowercased, params preserved |
+| `{spark:cpu_process_1m}` | `spark`    | `cpu_process_1m` | underscores belong to params            |
+| `{player:}`              | `player`   | *(empty)*        | dispatched with empty params            |
+| `{player}`               | —          | —                | no colon, so it stays literal           |
 
 Anything that cannot be resolved is left exactly as written: malformed syntax, an unknown
 identifier, an expansion that returns no value, or an expansion exception. An empty
@@ -35,10 +35,10 @@ one-pass and nonrecursive.
 
 `{rel:identifier:params}` is a separate, relational form handled only by
 `setRelationalPlaceholders` / `set_relational_placeholders`, and only by expansions that
-opt in to the relational callback. The `rel:` prefix selects relational parsing. The next colon separates the relational
-expansion identifier from its parameters; everything after that second colon is passed
-through unchanged. For example, `{rel:friends:is_friend}` dispatches identifier `friends`
-with params `is_friend`.
+opt in to the relational callback. The `rel:` prefix selects relational parsing. The next
+colon separates the relational expansion identifier from its parameters; everything after
+that second colon is passed through unchanged. For example, `{rel:friends:is_friend}`
+dispatches identifier `friends` with params `is_friend`.
 
 Identifiers must match `[A-Za-z0-9][A-Za-z0-9-]*`. Registration is case-insensitive,
 so identifiers that differ only by case collide. Dot, underscore, and colon are invalid
@@ -112,7 +112,6 @@ class MyPlugin(Plugin):
     soft_depend = ["papi"]
 
     def on_enable(self):
-        # The typed loader also rejects an unrelated service shadowing PAPI's name.
         service = PlaceholderAPI.load(self.server.service_manager)
         if service is None or not service.active:
             return
@@ -146,10 +145,10 @@ ordinary placeholder player may be null / `None`.
 
 | Command                         | Description                                                                  |
 | ------------------------------- | ---------------------------------------------------------------------------- |
-| `/papi parse <text>`          | Parse text using the sender when it is a player; otherwise use a null player |
-| `/papi parse <target> <text>` | Parse text for a player name,`me`, or `--null` target                    |
-| `/papi list`                  | List every registered identifier                                             |
-| `/papi info <identifier>`     | Show one expansion's metadata                                                |
+| `/papi parse <text>`            | Parse text using the sender when it is a player; otherwise use a null player |
+| `/papi parse <target> <text>`   | Parse text for a player name, `me`, or `--null` target                       |
+| `/papi list`                    | List every registered identifier                                             |
+| `/papi info <identifier>`       | Show one expansion's metadata                                                |
 
 All require the `papi.command.papi` permission, which defaults to operators. `me` is
 valid only for a player sender; invalid player names are rejected. Text may contain
@@ -161,10 +160,7 @@ Python: 3.10+
 
 Endstone: `>=0.11.8,<0.12` (API 0.11)
 
-Build and CI baseline: `0.11.11`. The dependency range alone does not
-establish native wheel compatibility with every permitted Endstone version.
-
-Supported packages: x86-64 Windows and Linux.
+Platforms: x86-64 Windows and Linux.
 
 ## Building from source
 

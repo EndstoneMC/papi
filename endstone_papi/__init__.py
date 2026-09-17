@@ -6,18 +6,8 @@ expansion registry, and a service that resolves ``{identifier:params}``
 placeholders through expansions supplied by C++ or Python plugins.
 """
 
-# Linux wheels contain build-time-created standard-SONAME bridge DSOs beside
-# _papi. They forward to Endstone's auditwheel-hashed LLVM runtime through
-# origin-relative RPATHs. Endstone owns the one runtime stack; this package does
-# not mutate site-packages or select a system runtime at import time.
-#
-# We must NOT import endstone._python here: doing so would register Endstone's
-# pybind11 translate_exception as the global translator before _papi loads, and
-# with -fvisibility=hidden that translator cannot catch std::exception thrown
-# from _papi (cross-DSO RTTI mismatch), turning every provider error into "Caught
-# an unknown exception!".  _papi's module init imports endstone.plugin itself,
-# which triggers endstone._python loading at the right time (after _papi's own
-# translator is registered).
+# Load PAPI's native extension before Endstone's Python bindings so provider
+# exceptions are translated by the module that owns them.
 try:
     from ._native_loader import load_native as _load_native
     from ._native_loader import should_use_shadow as _should_use_shadow
@@ -38,10 +28,8 @@ try:
 except ImportError as _e:
     raise ImportError(
         f"Failed to load the native PAPI extension: {_e}. "
-        "This usually means the Endstone C++ runtime is not available or "
-        "the installed Endstone version is incompatible. "
-        "PAPI declares endstone>=0.11.8,<0.12 (API 0.11); "
-        "the native runtime must also be compatible with the installed wheel."
+        "PAPI requires Endstone >=0.11.8,<0.12 (API 0.11). "
+        "After updating PAPI or Endstone, restart the server before trying again."
     ) from _e
 
 from .plugin import PlaceholderAPIPlugin

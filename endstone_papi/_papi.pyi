@@ -82,8 +82,8 @@ class PlaceholderExpansion:
         """The identifier this expansion answers to.
 
         Must match ``[A-Za-z0-9][A-Za-z0-9-]*``, and is canonicalized to lowercase.
-        Dot separates the identifier from parameters; underscore belongs to parameters.
-        Neither is allowed in an identifier.
+        The colon separates the identifier from parameters. Dots and underscores may
+        be used in parameters, but are not allowed in an identifier.
         """
 
     @property
@@ -150,7 +150,7 @@ class PlaceholderAPI(Service):
 
     @staticmethod
     def load(service_manager: ServiceManager) -> PlaceholderAPI | None:
-        """Load the active native service, or None when it is unavailable or shadowed."""
+        """Load the active PlaceholderAPI service, or None when it is unavailable."""
 
     @property
     def active(self) -> bool:

@@ -40,9 +40,9 @@ public:
      *
      * Must match <code>[A-Za-z0-9][A-Za-z0-9-]*</code>. It is canonicalized to
      * ASCII lowercase, so <code>Demo</code> and <code>demo</code> are the same
-     * identifier and cannot both be registered. Dot separates the identifier from
-     * parameters, while underscore is available inside parameters, so neither is
-     * permitted in an identifier.
+     * identifier and cannot both be registered. The colon separates the identifier
+     * from parameters. Dots and underscores are not permitted in an identifier, but
+     * may be used freely inside parameters.
      *
      * @return the identifier, queried once at registration
      */
@@ -93,8 +93,7 @@ public:
     /**
      * @brief Whether this expansion answers relational placeholders.
      *
-     * Declaring the capability explicitly avoids a cast across the plugin
-     * boundary. When false, onRelationalRequest is never called.
+     * When false, onRelationalRequest is never called.
      *
      * @return true if onRelationalRequest is implemented
      */
