@@ -78,42 +78,69 @@ def test_linux_runtime_bootstrap_retries_transient_download_failures() -> None:
     )
     with TemporaryDirectory() as temporary_directory:
         root = Path(temporary_directory)
-        state = root / "attempts"
+        state = root / "download-attempts"
+        apt_state = root / "apt-attempts"
         installer = root / "installer.sh"
         wget = root / "wget"
+        apt = root / "apt-get"
         llvm_script = root / "llvm.sh"
         installer.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         wget.write_text(
             f'#!/bin/sh\nattempt=$(cat "{state}" 2>/dev/null || printf 0)\nattempt=$((attempt + 1))\n'
             f'printf "%s" "$attempt" > "{state}"\n'
-            'if [ "$attempt" -le "${FAILURES:-0}" ]; then exit 9; fi\n'
+            'if [ "$attempt" -le "${DOWNLOAD_FAILURES:-0}" ]; then exit 9; fi\n'
             f'cp "{installer}" "$2"\n',
             encoding="utf-8",
         )
-        wget.chmod(0o755)
-        command = retry.replace("wget", str(wget), 1).replace("/tmp/llvm.sh", str(llvm_script))
+        apt.write_text(
+            f'#!/bin/sh\nattempt=$(cat "{apt_state}" 2>/dev/null || printf 0)\nattempt=$((attempt + 1))\n'
+            f'printf "%s" "$attempt" > "{apt_state}"\n'
+            'if [ "$attempt" -le "${APT_FAILURES:-0}" ]; then exit 100; fi\n',
+            encoding="utf-8",
+        )
+        for path in (wget, apt):
+            path.chmod(0o755)
+        command = (
+            retry.replace("wget", str(wget), 1)
+            .replace("apt-get", str(apt), 1)
+            .replace("/tmp/llvm.sh", str(llvm_script))
+        )
         command = command.replace("sleep 5", ":").replace("sleep 15", ":")
 
-        transient = subprocess.run(
-            ["sh", "-c", command],
-            env=dict(os.environ, FAILURES="1"),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        def run_case(download_failures: int, apt_failures: int) -> subprocess.CompletedProcess[str]:
+            state.unlink(missing_ok=True)
+            apt_state.unlink(missing_ok=True)
+            return subprocess.run(
+                ["sh", "-c", command],
+                env=dict(
+                    os.environ,
+                    DOWNLOAD_FAILURES=str(download_failures),
+                    APT_FAILURES=str(apt_failures),
+                ),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        transient = run_case(1, 0)
         assert transient.returncode == 0, transient.stderr
         assert state.read_text(encoding="utf-8") == "2"
+        assert apt_state.read_text(encoding="utf-8") == "1"
 
-        state.unlink()
-        permanent = subprocess.run(
-            ["sh", "-c", command],
-            env=dict(os.environ, FAILURES="3"),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        permanent = run_case(3, 0)
         assert permanent.returncode == 9, permanent.stderr
         assert state.read_text(encoding="utf-8") == "3"
+        assert not apt_state.exists()
+
+        apt_transient = run_case(0, 1)
+        assert apt_transient.returncode == 0, apt_transient.stderr
+        assert state.read_text(encoding="utf-8") == "2"
+        assert apt_state.read_text(encoding="utf-8") == "2"
+
+        apt_permanent = run_case(0, 3)
+        assert apt_permanent.returncode == 100, apt_permanent.stderr
+        assert state.read_text(encoding="utf-8") == "3"
+        assert apt_state.read_text(encoding="utf-8") == "3"
 
 
 def test_conan_and_pep517_backend_are_exactly_constrained() -> None:
