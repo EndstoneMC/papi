@@ -1,7 +1,10 @@
 """Regressions for ABI-sensitive compiler and backend provenance."""
 
 import importlib.util
+import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -64,6 +67,53 @@ def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None
     assert "-DLIBCXX_INCLUDE_TESTS=OFF" in runtime_builder
     assert "-DLIBCXXABI_INCLUDE_TESTS=OFF" in runtime_builder
     assert "clang version (1[89]|[2-9][0-9])" not in source
+
+
+def test_linux_runtime_bootstrap_retries_transient_download_failures() -> None:
+    if sys.platform == "win32" or shutil.which("sh") is None:
+        return
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    retry = next(
+        command for command in config["tool"]["cibuildwheel"]["linux"]["before-all"] if "for attempt in" in command
+    )
+    with TemporaryDirectory() as temporary_directory:
+        root = Path(temporary_directory)
+        state = root / "attempts"
+        installer = root / "installer.sh"
+        wget = root / "wget"
+        llvm_script = root / "llvm.sh"
+        installer.write_text(
+            f'#!/bin/sh\nattempt=$(cat "{state}" 2>/dev/null || printf 0)\nattempt=$((attempt + 1))\n'
+            f'printf "%s" "$attempt" > "{state}"\n'
+            'if [ "$attempt" -le "${FAILURES:-0}" ]; then exit 9; fi\n',
+            encoding="utf-8",
+        )
+        wget.write_text(f'#!/bin/sh\ncp "{installer}" "$2"\n', encoding="utf-8")
+        for path in (installer, wget):
+            path.chmod(0o755)
+        command = retry.replace("wget", str(wget), 1).replace("/tmp/llvm.sh", str(llvm_script), 1)
+        command = command.replace("sleep 5", ":").replace("sleep 15", ":")
+
+        transient = subprocess.run(
+            ["sh", "-c", command],
+            env=dict(os.environ, FAILURES="1"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert transient.returncode == 0, transient.stderr
+        assert state.read_text(encoding="utf-8") == "2"
+
+        state.unlink()
+        permanent = subprocess.run(
+            ["sh", "-c", command],
+            env=dict(os.environ, FAILURES="3"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert permanent.returncode == 9, permanent.stderr
+        assert state.read_text(encoding="utf-8") == "3"
 
 
 def test_conan_and_pep517_backend_are_exactly_constrained() -> None:
