@@ -13,6 +13,7 @@ import re
 import sys
 from pathlib import Path
 
+
 def validate_provenance(provenance: str, *, official: bool = False) -> None:
     assert re.search(r"^compiler_id=Clang$", provenance, re.MULTILINE), provenance
     compiler_version = re.search(r"^compiler_version=(\d+)(?:\.|$)", provenance, re.MULTILINE)
