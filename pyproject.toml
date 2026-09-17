@@ -5,7 +5,7 @@ requires = [
     "conan==2.30.0",
     "pybind11==3.0.1",
     "auditwheel==6.4.2; sys_platform == 'linux'",
-    "endstone==0.11.8; sys_platform == 'linux'",
+    "endstone==0.11.11; sys_platform == 'linux'",
     "patchelf==0.17.2.4; sys_platform == 'linux'",
     "wheel==0.46.2; sys_platform == 'linux'",
 ]
@@ -39,7 +39,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 # PAPI and Endstone share an ABI-sensitive native runtime.
-dependencies = ["endstone>=0.11.8,<0.12"]
+dependencies = ["endstone==0.11.11"]
 
 [project.urls]
 Homepage = "https://github.com/EndstoneMC/papi"
@@ -90,7 +90,7 @@ skip = ["*-musllinux*", "*_i686", "*-win32"]
 manylinux-x86_64-image = "ghcr.io/endstonemc/manylinux_2_31_x86_64"
 environment = { CC = "/usr/bin/clang-20", CXX = "/usr/bin/clang++-20" }
 # Wheel repair requires Endstone's exact hashed runtime SONAMEs.
-before-build = "pip install ninja wheel endstone==0.11.8"
+before-build = "pip install ninja wheel endstone==0.11.11"
 # The backend repairs wheels built directly or from an sdist.
 repair-wheel-command = ""
 before-all = [

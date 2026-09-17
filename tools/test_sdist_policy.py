@@ -49,11 +49,11 @@ def _assert_isolated_sdist_flow(source: str) -> None:
     assert "--compare" in source
     assert "--auditwheel" in source
     assert "export PATH=/opt/python/cp312-cp312/bin:$PATH" in source
-    assert '"endstone==0.11.8"' in source
+    assert '"endstone==0.11.11"' in source
     assert 'ldd "$module"' in source
     assert "native import unexpectedly succeeded without Endstone libc++" in source
     assert "assert not any('=> /usr/' in line for line in runtime)" in source
-    assert "/tmp/papi-sdist-smoke-env/bin/pip install endstone==0.11.8" not in source
+    assert "/tmp/papi-sdist-smoke-env/bin/pip install endstone==0.11.11" not in source
 
 
 def _fake_delegate_wheel(wheel_directory: str, *_args: object) -> str:

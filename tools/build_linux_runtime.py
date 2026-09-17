@@ -1,4 +1,4 @@
-"""Build the exact Linux libc++/libc++abi link-time runtime used by PAPI wheels."""
+"""Build the exact shared LLVM link-time runtime used by PAPI wheels."""
 
 from __future__ import annotations
 
@@ -45,17 +45,22 @@ def main() -> int:
                 f"-DCMAKE_C_COMPILER={compiler}",
                 f"-DCMAKE_CXX_COMPILER={compiler_cxx}",
                 "-DCMAKE_BUILD_TYPE=Release",
-                "-DLLVM_ENABLE_RUNTIMES=libcxx;libcxxabi",
+                "-DLLVM_ENABLE_RUNTIMES=libunwind;libcxx;libcxxabi",
                 "-DLIBCXX_CXX_ABI=libcxxabi",
-                "-DLIBCXXABI_USE_LLVM_UNWINDER=OFF",
+                "-DLIBCXXABI_USE_LLVM_UNWINDER=ON",
+                "-DLIBCXXABI_STATICALLY_LINK_UNWINDER_IN_SHARED_LIBRARY=OFF",
+                "-DLIBUNWIND_ENABLE_SHARED=ON",
+                "-DLIBUNWIND_INCLUDE_TESTS=OFF",
                 "-DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=OFF",
                 "-DLIBCXX_INCLUDE_TESTS=OFF",
                 "-DLIBCXXABI_INCLUDE_TESTS=OFF",
             ]
         )
-        subprocess.check_call(["cmake", "--build", str(build), "--target", "install-cxx", "install-cxxabi", "--"])
+        subprocess.check_call(
+            ["cmake", "--build", str(build), "--target", "install-cxx", "install-cxxabi", "install-unwind", "--"]
+        )
 
-    print(f"build_linux_runtime: installed LLVM {_VERSION} libc++/libc++abi with the system unwinder")
+    print(f"build_linux_runtime: installed LLVM {_VERSION} shared libc++/libc++abi/libunwind")
     return 0
 
 

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux wheels establish their Endstone-owned C++ runtime-family dependency with
   standard-SONAME bridge DSOs, avoiding direct hashed-SONAME loader crashes and
   import-time mutation of the installed package directory.
-- `endstone>=0.11.8,<0.12` is now declared as a runtime dependency, so
+- `endstone==0.11.11` is now declared as a runtime dependency, so
   `pip install endstone-papi` resolves the required Endstone C++ runtime
   automatically.
 - Linux developer wheel repair now accepts Clang 18 or newer while official wheels remain pinned to Clang 20.

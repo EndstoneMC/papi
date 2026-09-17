@@ -7,7 +7,7 @@ placeholders through expansions supplied by C++ or Python plugins.
 """
 
 # Linux wheels contain build-time-created standard-SONAME bridge DSOs beside
-# _papi. They forward to Endstone's auditwheel-hashed libc++/libc++abi through
+# _papi. They forward to Endstone's auditwheel-hashed LLVM runtime through
 # origin-relative RPATHs. Endstone owns the one runtime stack; this package does
 # not mutate site-packages or select a system runtime at import time.
 #
@@ -40,7 +40,7 @@ except ImportError as _e:
         f"Failed to load the native PAPI extension: {_e}. "
         "This usually means the Endstone C++ runtime is not available or "
         "the installed Endstone version is incompatible. "
-        "PAPI requires endstone>=0.11.8,<0.12."
+        "PAPI requires endstone==0.11.11 (API 0.11)."
     ) from _e
 
 from .plugin import PlaceholderAPIPlugin

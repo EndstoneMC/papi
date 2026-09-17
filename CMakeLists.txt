@@ -40,7 +40,12 @@ else ()
     message(FATAL_ERROR "endstone_papi: ${CMAKE_SYSTEM_NAME} is not supported")
 endif ()
 
-set(PAPI_ENDSTONE_TAG "v0.11.8" CACHE STRING "Endstone tag providing the public API headers")
+if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+    message(FATAL_ERROR
+            "endstone_papi: Clang 18 or newer is required, but CMake detected ${CMAKE_CXX_COMPILER_VERSION}.")
+endif ()
+
+set(PAPI_ENDSTONE_TAG "v0.11.11" CACHE STRING "Endstone tag providing the public API headers")
 
 include(FetchContent)
 FetchContent_Declare(
@@ -79,14 +84,11 @@ set_target_properties(_papi PROPERTIES
         VISIBILITY_INLINES_HIDDEN ON)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # _papi.so is linked with NEEDED libc++.so.1 and libc++abi.so.1 (standard
-    # SONAMEs). tools/repair_wheel.py preserves those entries and installs tiny
-    # standard-SONAME bridge DSOs whose only NEEDED entries name Endstone's
-    # auditwheel-hashed runtime. DT_RPATH (via --disable-new-dtags) propagates to
-    # those transitive dependencies without preloading or import-time mutation.
+    # DT_RPATH propagates through the shared LLVM runtime bridges.
+    target_link_libraries(_papi PRIVATE -l:libc++.so.1 -l:libc++abi.so.1 -l:libunwind.so.1)
     set_target_properties(_papi PROPERTIES
             INSTALL_RPATH "$ORIGIN/../endstone.libs;$ORIGIN"
-            LINK_OPTIONS "-Wl,--disable-new-dtags")
+            LINK_OPTIONS "LINKER:--disable-new-dtags;LINKER:--as-needed")
 endif ()
 
 # Test-only bindings let Python regression tests construct internal types directly.

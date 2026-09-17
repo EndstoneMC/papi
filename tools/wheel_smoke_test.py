@@ -8,25 +8,32 @@ pytest suite (which uses the dev build with test-only bindings).
 
 from __future__ import annotations
 
+import argparse
+import re
 import sys
 from pathlib import Path
 
-import endstone_papi
-from endstone_papi import (
-    ExpansionInfo,
-    PlaceholderAPI,
-    PlaceholderExpansion,
-    UnregisterReason,
-)
+def validate_provenance(provenance: str, *, official: bool = False) -> None:
+    assert re.search(r"^compiler_id=Clang$", provenance, re.MULTILINE), provenance
+    compiler_version = re.search(r"^compiler_version=(\d+)(?:\.|$)", provenance, re.MULTILINE)
+    assert compiler_version is not None, provenance
+    major = int(compiler_version.group(1))
+    assert major == 20 if official else major >= 18, provenance
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--official", action="store_true", help="Require the official Clang 20 wheel toolchain")
+    args = parser.parse_args()
+
+    import endstone_papi
+    from endstone_papi import ExpansionInfo, PlaceholderAPI, PlaceholderExpansion, UnregisterReason
+
     version = endstone_papi.__version__
     assert version, f"empty version: {version!r}"
     assert endstone_papi.SERVICE_NAME == "PlaceholderAPI"
     provenance = Path(endstone_papi.__file__).with_name("_toolchain_provenance.txt").read_text(encoding="utf-8")
-    assert "compiler_id=Clang" in provenance, provenance
-    assert "compiler_version=20." in provenance, provenance
+    validate_provenance(provenance, official=args.official)
 
     # PlaceholderExpansion is subclassable and metadata is readable through the
     # native trampoline.

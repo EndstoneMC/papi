@@ -60,7 +60,7 @@ def test_no_libc_symlinks_in_package_directory() -> None:
     symlinks here.  The build-time NEEDED-patching approach does not.
     """
     pkg_dir = pathlib.Path(endstone_papi.__file__).resolve().parent
-    for soname in ("libc++.so.1", "libc++abi.so.1"):
+    for soname in ("libc++.so.1", "libc++abi.so.1", "libunwind.so.1"):
         assert not (pkg_dir / soname).exists(), f"{soname} must not exist in package directory"
 
 
@@ -73,7 +73,7 @@ def test_pyproject_declares_endstone_runtime_dependency() -> None:
 def test_pyproject_linux_before_build_installs_endstone() -> None:
     """The Linux cibuildwheel before-build must install endstone for repair_wheel.py."""
     content = _PYPROJECT.read_text(encoding="utf-8")
-    assert "endstone==0.11.8" in content, "before-build must pin endstone for build-time SONAME discovery"
+    assert "endstone==0.11.11" in content, "before-build must pin endstone for build-time SONAME discovery"
     assert "pip install ninja wheel endstone" in content, "before-build must install wheel for unpacking and repacking"
 
 
@@ -133,4 +133,4 @@ def test_repair_wheel_script_fails_closed_on_missing_compiler() -> None:
     """If the configured compiler is unavailable or not Clang 20, fail closed."""
     source = _REPAIR_SCRIPT.read_text(encoding="utf-8")
     assert "compiler {compiler_name!r} not found" in source
-    assert "Clang 20 is required" in source
+    assert "Clang 18 or newer is required" in source

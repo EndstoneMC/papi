@@ -27,13 +27,14 @@ become the PlaceholderAPI core.
 - CMake 3.29 or newer
 - Ninja
 - Conan 2
-- Windows: LLVM clang-cl 20, the MSVC x64 build environment, and the Windows SDK
-- Linux: Clang 20 with libc++ and libc++abi
+- Windows: LLVM clang-cl 18 or newer, the MSVC x64 build environment, and the Windows SDK
+- Linux: Clang 18 or newer with libc++ and libc++abi
 - Python 3.10+ for the package and test tooling
 
 The repository owns `.conan2/profiles/default` and `.conanrc`. The profile selects
-RelWithDebInfo, C++20, Ninja, clang-cl on Windows, and Clang with libc++ on Linux. Do
-not run `conan profile detect`, because that would replace the project profile.
+RelWithDebInfo, C++20, Ninja, clang-cl on Windows, and Clang with libc++ on Linux. CI
+and release wheels pin Clang 20. Do not run `conan profile detect`, because that would
+replace the project profile.
 
 ### Configure and build
 
@@ -55,7 +56,7 @@ The main outputs are:
 
 For local Endstone development, CMake accepts
 `-DFETCHCONTENT_SOURCE_DIR_ENDSTONE=<path>` to use an existing Endstone checkout.
-Otherwise it fetches Endstone `v0.11.8`.
+Otherwise it fetches Endstone `v0.11.11` (API 0.11).
 
 ## Test Commands
 
@@ -420,7 +421,7 @@ reserved by relational syntax.
 
 ### ABI
 
-- Tied to Endstone 0.11, C++20, target architecture, standard library, compiler runtime,
+- Tied to Endstone `0.11.11` (API 0.11), C++20, target architecture, standard library, compiler runtime,
   and Python minor wheel.
 - C++ providers must use a toolchain compatible with the running Endstone/PAPI build.
 - Implementation/private locks/maps/pybind types must not leak into public headers.

@@ -4,6 +4,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.scm import Version
 
 
 class PapiRecipe(ConanFile):
@@ -59,9 +60,9 @@ class PapiRecipe(ConanFile):
         if self.settings.os == "Linux" and self.settings.compiler.libcxx != "libc++":
             raise ConanInvalidConfiguration(f"{self.ref} requires libc++ on Linux for Endstone ABI compatibility.")
 
-        if self.settings.os == "Linux" and str(self.settings.compiler.version) != "20":
+        if self.settings.os == "Linux" and Version(str(self.settings.compiler.version)) < "18":
             raise ConanInvalidConfiguration(
-                f"{self.ref} requires Clang 20 on Linux for Endstone ABI compatibility, "
+                f"{self.ref} requires Clang 18 or newer on Linux for Endstone ABI compatibility, "
                 f"not Clang {self.settings.compiler.version}."
             )
 

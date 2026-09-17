@@ -159,15 +159,15 @@ spaces, and selectors are not supported.
 
 Python: 3.10+
 
-Endstone: `>=0.11.8,<0.12` (API 0.11)
+Endstone: `==0.11.11` (API 0.11)
 
 Supported packages: x86-64 Windows and Linux.
 
 ## Building from source
 
-Requires CMake 3.29+, Ninja, Conan 2.30.0, and the Endstone toolchain: clang-cl 20
-with an x64 MSVC developer environment and Windows SDK on Windows, or Clang 20 with
-libc++ and libc++abi on Linux.
+Requires CMake 3.29+, Ninja, Conan 2.30.0, and the Endstone toolchain: clang-cl 18+
+with an x64 MSVC developer environment and Windows SDK on Windows, or Clang 18+ with
+libc++ and libc++abi on Linux. CI and release wheels use Clang 20.
 
 ```shell
 python -m pip install "conan==2.30.0"

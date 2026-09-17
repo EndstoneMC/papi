@@ -13,7 +13,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-_BRIDGES = ("libc++.so.1", "libc++abi.so.1")
+_BRIDGES = ("libc++.so.1", "libc++abi.so.1", "libunwind.so.1")
 _CPP_RUNTIME_PREFIXES = ("libc++", "libc++abi", "libunwind")
 _EXPECTED_PLATFORM = "manylinux_2_31_x86_64"
 _PLATFORM_PATTERN = re.compile(r"manylinux_(\d+)_(\d+)_x86_64")

@@ -1,6 +1,7 @@
 """Regressions for ABI-sensitive compiler and backend provenance."""
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,15 +16,30 @@ repair_wheel = importlib.util.module_from_spec(REPAIR_SPEC)
 sys.modules[REPAIR_SPEC.name] = repair_wheel
 REPAIR_SPEC.loader.exec_module(repair_wheel)
 
+SMOKE_SPEC = importlib.util.spec_from_file_location("papi_wheel_smoke", ROOT / "tools" / "wheel_smoke_test.py")
+assert SMOKE_SPEC is not None and SMOKE_SPEC.loader is not None
+wheel_smoke = importlib.util.module_from_spec(SMOKE_SPEC)
+sys.modules[SMOKE_SPEC.name] = wheel_smoke
+SMOKE_SPEC.loader.exec_module(wheel_smoke)
+
 
 def test_cmake_requires_endstone_compiler_family_and_records_provenance() -> None:
     source = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert 'CMAKE_CXX_COMPILER_ID MATCHES "Clang"' in source
     assert 'CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"' in source
     assert "CMAKE_LINKER_TYPE LLD" in source
-    assert "CMAKE_CXX_COMPILER_VERSION VERSION_LESS" not in source
+    assert "CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18" in source
     assert "toolchain_provenance.txt" in source
     assert "_toolchain_provenance.txt" in source
+
+
+def test_cmake_compiler_floor_accepts_supported_majors() -> None:
+    source = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    match = re.search(r"CMAKE_CXX_COMPILER_VERSION VERSION_LESS (\d+)", source)
+    assert match is not None
+    floor = int(match.group(1))
+    for major, accepted in ((17, False), (18, True), (20, True), (22, True)):
+        assert (major >= floor) is accepted, (major, floor)
 
 
 def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None:
@@ -41,7 +57,10 @@ def test_manylinux_uses_exact_clang_major_and_verified_runtime_sources() -> None
     assert "python /project/tools/build_linux_runtime.py" in source
     assert '"20.1.8"' in runtime_builder
     assert "6898f963c8e938981e6c4a302e83ec5beb4630147c7311183cf61069af16333d" in runtime_builder
-    assert "-DLIBCXXABI_USE_LLVM_UNWINDER=OFF" in runtime_builder
+    assert "-DLLVM_ENABLE_RUNTIMES=libunwind;libcxx;libcxxabi" in runtime_builder
+    assert "-DLIBCXXABI_USE_LLVM_UNWINDER=ON" in runtime_builder
+    assert "-DLIBCXXABI_STATICALLY_LINK_UNWINDER_IN_SHARED_LIBRARY=OFF" in runtime_builder
+    assert '"install-unwind"' in runtime_builder
     assert "-DLIBCXX_INCLUDE_TESTS=OFF" in runtime_builder
     assert "-DLIBCXXABI_INCLUDE_TESTS=OFF" in runtime_builder
     assert "clang version (1[89]|[2-9][0-9])" not in source
@@ -57,11 +76,14 @@ def test_conan_and_pep517_backend_are_exactly_constrained() -> None:
     assert '"conan==2.30.0"' in pyproject
     assert '"pybind11==3.0.1"' in pyproject
     assert workflow.count("conan==2.30.0") == 2
-    assert 'str(self.settings.compiler.version) != "20"' in recipe
-    assert "compiler.version=20" in profile
-    assert '"c": "/usr/bin/clang-20"' in profile
-    assert '"cpp": "/usr/bin/clang++-20"' in profile
-    assert "detect_clang_compiler" not in profile
+    assert 'Version(str(self.settings.compiler.version)) < "18"' in recipe
+    assert "detect_clang_compiler" in profile
+    assert 'os.getenv("CC", "clang")' in profile
+    assert 'os.getenv("CXX", "clang++")' in profile
+    assert "detect_clang_compiler(cpp_compiler)" in profile
+    assert '{"c": c_compiler, "cpp": cpp_compiler} | tojson' in profile
+    assert "compiler.version=20" not in profile
+    assert "/usr/bin/clang-20" not in profile
 
 
 def test_official_windows_build_still_pins_clang_cl_20() -> None:
@@ -72,17 +94,36 @@ def test_official_windows_build_still_pins_clang_cl_20() -> None:
 
 def test_wheel_validation_requires_compiler_provenance() -> None:
     workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
-    smoke = (ROOT / "tools" / "wheel_smoke_test.py").read_text(encoding="utf-8")
     template = (ROOT / "cmake" / "toolchain_provenance.txt.in").read_text(encoding="utf-8")
 
     assert "compiler_version=20." in workflow
-    assert "compiler_version=20." in smoke
+    assert "validate_provenance" in (ROOT / "tools" / "wheel_smoke_test.py").read_text(encoding="utf-8")
+    assert "wheel_smoke_test.py --official" in workflow
     assert "@CMAKE_CXX_COMPILER_VERSION@" in template
 
     repair = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")
     assert 'os.environ.get("CC", "clang")' in repair
     assert 'r"\\bclang version (\\d+)(?:\\.|\\s|$)"' in repair
     assert "int(clang_match.group(1)) < 18" in repair
+
+
+def test_wheel_smoke_accepts_developer_clang_and_requires_official_clang20() -> None:
+    for major in (18, 19, 20, 22, 200):
+        provenance = f"compiler_id=Clang\ncompiler_version={major}.1.8\n"
+        wheel_smoke.validate_provenance(provenance)
+        try:
+            wheel_smoke.validate_provenance(provenance, official=True)
+        except AssertionError:
+            assert major != 20, major
+        else:
+            assert major == 20, major
+    for provenance in ("", "compiler_id=GNU\ncompiler_version=20.1.8\n", "compiler_id=Clang\n"):
+        try:
+            wheel_smoke.validate_provenance(provenance)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError(f"invalid provenance accepted: {provenance!r}")
 
 
 def test_repair_accepts_clang_18_or_newer_and_reaches_auditwheel() -> None:
