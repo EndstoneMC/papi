@@ -216,7 +216,7 @@ PYBIND11_MODULE(_papi, m)
             "load",
             [](const endstone::ServiceManager &manager) { return papi::detail::ServicePublication::load(manager); },
             py::arg("service_manager"),
-            "Loads the active PlaceholderAPI service. Returns None when it is unavailable.")
+            "Loads the active PlaceholderAPI service. Returns None when no active PAPI service is available.")
         .def_property_readonly("active", &papi::PlaceholderAPI::isActive,
                                "Whether this service is still usable. False once PAPI has been disabled.")
         .def("set_placeholders", &papi::PlaceholderAPI::setPlaceholders, py::arg("player"), py::arg("text"),
