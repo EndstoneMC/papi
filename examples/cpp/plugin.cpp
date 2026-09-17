@@ -21,7 +21,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "Endstone"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *player,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
                                                        const std::string_view params) override
     {
         if (params != "name") {
@@ -39,10 +39,8 @@ class JoinExample : public endstone::Plugin {
 public:
     void onEnable() override
     {
-        api_ = getServer()
-                   .getServiceManager()
-                   .load<papi::PlaceholderAPI>(std::string(papi::PlaceholderAPI::ServiceName))
-                   .get();
+        api_ =
+            getServer().getServiceManager().load<papi::PlaceholderAPI>(std::string(papi::PlaceholderAPI::ServiceName));
         if (!api_ || !api_->isActive()) {
             getLogger().warning("PlaceholderAPI is unavailable; disabling example.");
             getServer().getPluginManager().disablePlugin(*this);
@@ -71,7 +69,7 @@ public:
         if (!api_) {
             return;
         }
-        event.setJoinMessage(api_->setPlaceholders(event.getPlayer().get().get(), "{player:name} joined the server!"));
+        event.setJoinMessage(api_->setPlaceholders(&event.getPlayer(), "{player:name} joined the server!"));
     }
 
 private:

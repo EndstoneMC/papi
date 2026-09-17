@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Python event metadata is now an independent snapshot that remains safe to retain after the callback.
 - Linux wheels now advertise Endstone's `manylinux_2_31` baseline and fail packaging when their ELF requirements exceed it.
 - `/papi` subcommands now use explicit command enum names, preventing duplicate enum registration while preserving both
   parse forms and multi-word text.
@@ -19,24 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux wheels establish their Endstone-owned C++ runtime-family dependency with
   standard-SONAME bridge DSOs, avoiding direct hashed-SONAME loader crashes and
   import-time mutation of the installed package directory.
-- Runtime installation and Linux wheel repair now use the same verified official
-  Endstone `0.11.11.dev392` wheels (API 0.12, build `33562961160`). Snapshot installs
-  require the supplied wheelhouse; production releases remain blocked until a
-  supported stable runtime is selected.
+- `endstone>=0.11.8,<0.12` is now declared as a runtime dependency, so
+  `pip install endstone-papi` resolves the required Endstone C++ runtime
+  automatically.
 - Linux developer wheel repair now accepts Clang 18 or newer while official wheels remain pinned to Clang 20.
 
 ### Changed
 
-- **BREAKING**: Event dispatch names are now `endstone_papi.ExpansionRegisteredEvent` and
-  `endstone_papi.ExpansionUnregisteredEvent`, matching automatic Python listener registration.
-  Rebuild native listeners and update raw event-name registrations; old binaries and unqualified names are incompatible.
-- Development builds now accept Clang/clang-cl 18 or newer; official release
-  wheels remain pinned to Clang 20 for reproducibility.
-- **BREAKING**: Ordinary provider callbacks now receive `const endstone::Player*`
-  (`Player | None` in Python) instead of `OfflinePlayer`. Rebuild all native
-  consumers and providers against the migrated SDK and pinned Endstone API 0.12 snapshot.
-- Supported Python versions are now 3.11–3.14, with eight release wheels across
-  Windows and Linux.
 - Placeholder routing now uses a colon namespace boundary: ordinary placeholders are
   `{identifier:params}` and relational placeholders are `{rel:identifier:params}`.
   Only the routing colon(s) are interpreted by PAPI; provider params preserve
@@ -64,14 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bounded 60-second error throttling with injectable monotonic clock
 - Strict ASCII identifier grammar `[A-Za-z0-9][A-Za-z0-9-]*`
 - Windows and Linux CI with clang-cl/Clang 20, Conan 2, CMake 3.29, and
-  CPython 3.11–3.14 wheel matrix
+  CPython 3.10–3.14 wheel matrix
 - Architecture boundary enforcement via automated tests
 - Deterministic changelog and release-note tooling
 - Automated release workflow with dry-run mode
 
 ### Removed
 
-- **BREAKING**: Python 3.10 support and `cp310` wheels
 - **BREAKING**: Python `PlaceholderAPI` constructor and subclassing (Architecture A)
 - **BREAKING**: Python registry, pipe parser, and all built-in placeholders
 - **BREAKING**: `{identifier|params}` pipe syntax

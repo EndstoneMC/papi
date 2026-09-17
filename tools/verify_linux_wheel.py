@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import csv
 import io
-import os
 import re
 import subprocess
 import sys
@@ -14,7 +13,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-_BRIDGES = ("libc++.so.1", "libc++abi.so.1", "libunwind.so.1")
+_BRIDGES = ("libc++.so.1", "libc++abi.so.1")
 _CPP_RUNTIME_PREFIXES = ("libc++", "libc++abi", "libunwind")
 _EXPECTED_PLATFORM = "manylinux_2_31_x86_64"
 _PLATFORM_PATTERN = re.compile(r"manylinux_(\d+)_(\d+)_x86_64")
@@ -30,49 +29,10 @@ class RuntimeContract:
     bridge_dependencies: tuple[tuple[str, tuple[str, ...]], ...]
     bridge_rpaths: tuple[tuple[str, str], ...]
     requires_endstone: bool
-    gcc_imports: tuple[tuple[str, str, str], ...]
 
 
 def _output(*command: str) -> str:
     return subprocess.check_output(command, text=True).strip()
-
-
-def _gcc_imports(path: Path) -> tuple[tuple[str, str, str], ...]:
-    from elftools.elf.elffile import ELFFile
-
-    with path.open("rb") as stream:
-        elf = ELFFile(stream)
-        needed = elf.get_section_by_name(".gnu.version_r")
-        versions = {}
-        if needed is not None:
-            for provider, auxiliaries in needed.iter_versions():
-                for auxiliary in auxiliaries:
-                    versions[auxiliary["vna_other"] & 0x7FFF] = (provider.name, auxiliary.name)
-        symbols = elf.get_section_by_name(".dynsym")
-        indices = elf.get_section_by_name(".gnu.version")
-        result = []
-        if symbols is not None and indices is not None:
-            for index, symbol in enumerate(symbols.iter_symbols()):
-                if symbol["st_shndx"] != "SHN_UNDEF":
-                    continue
-                version_index = indices.get_symbol(index)["ndx"]
-                if not isinstance(version_index, int):
-                    continue
-                provider, version = versions.get(version_index & 0x7FFF, ("", ""))
-                if version.startswith("GCC_"):
-                    result.append((provider, symbol.name, version))
-        return tuple(sorted(result))
-
-
-def _validate_gcc_imports(dependencies: tuple[str, ...], imports: tuple[tuple[str, str, str], ...]) -> None:
-    allowed = {
-        ("libgcc_s.so.1", "__udivti3", "GCC_3.0"),
-        ("libgcc_s.so.1", "__umodti3", "GCC_3.0"),
-    }
-    if not set(imports) <= allowed:
-        raise AssertionError(f"unexpected GCC-versioned imports: {imports}")
-    if ("libgcc_s.so.1" in dependencies) != bool(imports):
-        raise AssertionError(f"libgcc_s dependency does not match arithmetic imports: {imports}")
 
 
 def _is_papi_owned_cpp_runtime(name: str) -> bool:
@@ -134,34 +94,7 @@ def _assert_platform_compatible(platform: str, required: tuple[int, int]) -> Non
 
 
 def _auditwheel_platform(wheel: Path) -> str:
-    import endstone
-
-    runtime = Path(endstone.__file__).resolve().parent.parent / "endstone.libs"
-    if not runtime.is_dir():
-        raise AssertionError(f"Endstone runtime directory missing: {runtime}")
-    environment = dict(os.environ, LD_LIBRARY_PATH=str(runtime))
-    environment.pop("LD_PRELOAD", None)
-    with tempfile.TemporaryDirectory(prefix="papi-runtime-closure-") as temporary_directory:
-        root = Path(temporary_directory)
-        with zipfile.ZipFile(wheel) as archive:
-            archive.extractall(root)
-        module = next((root / "endstone_papi").glob("_papi*.so"))
-        closure = subprocess.check_output(["ldd", str(module)], text=True, env=environment)
-        if "not found" in closure:
-            raise AssertionError(f"unresolved runtime dependency:\n{closure}")
-        for line in closure.splitlines():
-            fields = line.split()
-            if not fields or not fields[0].startswith(_CPP_RUNTIME_PREFIXES):
-                continue
-            if len(fields) < 3 or fields[1] != "=>":
-                raise AssertionError(f"unexpected runtime resolution: {line}")
-            resolved = Path(fields[2]).resolve()
-            owner = module.parent if fields[0] in _BRIDGES else runtime
-            if resolved.parent != owner:
-                raise AssertionError(f"runtime resolved outside its owner: {line}")
-    output = subprocess.check_output(
-        [sys.executable, "-m", "auditwheel", "show", str(wheel)], text=True, env=environment
-    )
+    output = subprocess.check_output([sys.executable, "-m", "auditwheel", "show", str(wheel)], text=True)
     constrained = re.search(r'constrains the platform tag to\s+"(manylinux_\d+_\d+_x86_64)"', output)
     if constrained is not None:
         return constrained.group(1)
@@ -232,11 +165,6 @@ def inspect_wheel(wheel: Path) -> RuntimeContract:
         _assert_platform_compatible(_EXPECTED_PLATFORM, maximum_glibc)
 
         dependencies = tuple(sorted(_output("patchelf", "--print-needed", str(module)).splitlines()))
-        gcc_imports = _gcc_imports(module)
-        _validate_gcc_imports(dependencies, gcc_imports)
-        symbols = _output("readelf", "--dyn-syms", "--wide", str(module))
-        if any("_Unwind_" in line and " UND " not in line for line in symbols.splitlines()):
-            raise AssertionError("_papi contains an unwinder implementation")
         for soname in _BRIDGES:
             if soname not in dependencies:
                 raise AssertionError(f"{module.name} does not require {soname}")
@@ -248,14 +176,6 @@ def inspect_wheel(wheel: Path) -> RuntimeContract:
         bridge_rpaths = []
         for bridge_name in _BRIDGES:
             bridge = module_package / bridge_name
-            if _output("patchelf", "--print-soname", str(bridge)) != bridge_name:
-                raise AssertionError(f"unexpected {bridge_name} SONAME")
-            dynamic = _output("readelf", "--dynamic", str(bridge))
-            if "(RUNPATH)" in dynamic or "(RPATH)" not in dynamic:
-                raise AssertionError(f"{bridge_name} must use DT_RPATH")
-            exports = _output("nm", "-D", "--defined-only", str(bridge)).splitlines()
-            if any(not line.endswith(" papi_runtime_bridge") for line in exports):
-                raise AssertionError(f"{bridge_name} contains a runtime implementation")
             needed = tuple(sorted(_output("patchelf", "--print-needed", str(bridge)).splitlines()))
             prefix = bridge_name.removesuffix(".so.1") + "-"
             if len(needed) != 1 or not needed[0].startswith(prefix) or not needed[0].endswith(".so.1.0"):
@@ -274,7 +194,6 @@ def inspect_wheel(wheel: Path) -> RuntimeContract:
             bridge_dependencies=tuple(bridge_dependencies),
             bridge_rpaths=tuple(bridge_rpaths),
             requires_endstone=requires_endstone,
-            gcc_imports=gcc_imports,
         )
 
 

@@ -73,10 +73,8 @@ def test_pyproject_declares_endstone_runtime_dependency() -> None:
 def test_pyproject_linux_before_build_installs_endstone() -> None:
     """The Linux cibuildwheel before-build must install endstone for repair_wheel.py."""
     content = _PYPROJECT.read_text(encoding="utf-8")
-    assert "endstone==0.11.11.dev392" in content, (
-        "before-build must pin the Endstone API 0.12 snapshot for build-time SONAME discovery"
-    )
-    assert "pip install ninja wheel" in content, "before-build must install wheel for unpacking and repacking"
+    assert "endstone==0.11.8" in content, "before-build must pin endstone for build-time SONAME discovery"
+    assert "pip install ninja wheel endstone" in content, "before-build must install wheel for unpacking and repacking"
 
 
 def test_pyproject_routes_wheel_repair_through_build_backend() -> None:

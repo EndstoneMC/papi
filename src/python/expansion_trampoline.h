@@ -39,7 +39,7 @@ public:
     [[nodiscard]] bool supportsRelationalPlaceholders() const override;
     [[nodiscard]] bool supportsPlayerCleanup() const override;
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *player,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
                                                        std::string_view params) override;
     [[nodiscard]] std::optional<std::string> onRelationalRequest(const endstone::Player &one,
                                                                  const endstone::Player &two,

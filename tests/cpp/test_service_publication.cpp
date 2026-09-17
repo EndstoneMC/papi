@@ -17,10 +17,10 @@ namespace {
 
 class TestServiceManager final : public endstone::ServiceManager {
 public:
-    void registerService(std::string name, endstone::NotNull<endstone::Service> provider,
-                         const endstone::Plugin &plugin, const endstone::ServicePriority priority) override
+    void registerService(std::string name, std::shared_ptr<endstone::Service> provider, const endstone::Plugin &plugin,
+                         const endstone::ServicePriority priority) override
     {
-        registrations_.push_back({std::move(name), provider.get(), &plugin, priority, next_order_++});
+        registrations_.push_back({std::move(name), std::move(provider), &plugin, priority, next_order_++});
     }
 
     void unregisterAll(const endstone::Plugin &plugin) override
@@ -28,20 +28,20 @@ public:
         std::erase_if(registrations_, [&plugin](const Registration &entry) { return entry.plugin == &plugin; });
     }
 
-    void unregister(std::string name, const endstone::NotNull<endstone::Service> &provider) override
+    void unregister(std::string name, const endstone::Service &provider) override
     {
         std::erase_if(registrations_, [&name, &provider](const Registration &entry) {
-            return entry.name == name && entry.provider.get() == provider.get().get();
+            return entry.name == name && entry.provider.get() == &provider;
         });
     }
 
-    void unregister(const endstone::NotNull<endstone::Service> &provider) override
+    void unregister(const endstone::Service &provider) override
     {
         std::erase_if(registrations_,
-                      [&provider](const Registration &entry) { return entry.provider.get() == provider.get().get(); });
+                      [&provider](const Registration &entry) { return entry.provider.get() == &provider; });
     }
 
-    [[nodiscard]] endstone::Nullable<endstone::Service> get(std::string name) const override
+    [[nodiscard]] std::shared_ptr<endstone::Service> get(std::string name) const override
     {
         const Registration *selected = nullptr;
         for (const auto &entry : registrations_) {
@@ -53,7 +53,7 @@ public:
                 selected = &entry;
             }
         }
-        return selected == nullptr ? endstone::Nullable<endstone::Service>{nullptr} : selected->provider;
+        return selected == nullptr ? nullptr : selected->provider;
     }
 
 private:
@@ -116,7 +116,7 @@ TEST_F(ServicePublicationTest, CorrectActiveServiceReturnsTypedSharedOwner)
     ASSERT_NE(loaded, nullptr);
     EXPECT_EQ(loaded.get(), service_.get());
 
-    manager_.unregister(std::string(papi::PlaceholderAPI::ServiceName), service_);
+    manager_.unregister(std::string(papi::PlaceholderAPI::ServiceName), *service_);
     papi::detail::ServicePublication::withdraw(manager_, *service_);
     service_->shutdown();
     service_.reset();
@@ -151,7 +151,7 @@ TEST_F(ServicePublicationTest, LaterEqualPriorityWrongServiceIsRejectedAndRemova
 
     EXPECT_EQ(papi::detail::ServicePublication::load(manager_), nullptr);
 
-    manager_.unregister(std::string(papi::PlaceholderAPI::ServiceName), wrong);
+    manager_.unregister(std::string(papi::PlaceholderAPI::ServiceName), *wrong);
     EXPECT_EQ(papi::detail::ServicePublication::load(manager_).get(), service_.get());
 }
 
@@ -161,7 +161,7 @@ TEST_F(ServicePublicationTest, ReloadReplacesPublicationWithoutRevivingRetainedS
     auto retained = papi::detail::ServicePublication::load(manager_);
     ASSERT_NE(retained, nullptr);
 
-    manager_.unregister(std::string(papi::PlaceholderAPI::ServiceName), service_);
+    manager_.unregister(std::string(papi::PlaceholderAPI::ServiceName), *service_);
     papi::detail::ServicePublication::withdraw(manager_, *service_);
     service_->shutdown();
 

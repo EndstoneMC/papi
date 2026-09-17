@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include <endstone/offline_player.h>
 #include <endstone/player.h>
 #include <endstone/plugin/plugin.h>
 #include <endstone/plugin/service.h>
@@ -67,14 +68,13 @@ public:
      * when it is malformed, its identifier is not registered, or the expansion
      * returns no value or fails. Replacement text is never rescanned.
      *
-     * @param player the online player to resolve against; may be null. The pointer is
-     *        borrowed for the
-     * duration of this call only.
+     * @param player the player to resolve against; may be null
      * @param text the text to process
      * @return the processed text, or text unchanged if the service is inactive or
      *         this is not the primary thread
      */
-    [[nodiscard]] virtual std::string setPlaceholders(const endstone::Player *player, std::string_view text) const = 0;
+    [[nodiscard]] virtual std::string setPlaceholders(const endstone::OfflinePlayer *player,
+                                                      std::string_view text) const = 0;
 
     /**
      * @brief Replaces every resolvable <code>{rel:identifier:params}</code> in text.

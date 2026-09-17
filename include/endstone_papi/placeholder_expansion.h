@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include <endstone/offline_player.h>
 #include <endstone/player.h>
 
 #include "endstone_papi/unregister_reason.h"
@@ -39,9 +40,8 @@ public:
      *
      * Must match <code>[A-Za-z0-9][A-Za-z0-9-]*</code>. It is canonicalized to
      * ASCII lowercase, so <code>Demo</code> and <code>demo</code> are the same
-     * identifier and cannot both be registered. The colon separates the identifier
-     * from parameters, while
-     * underscore is available inside parameters, so neither is
+     * identifier and cannot both be registered. Dot separates the identifier from
+     * parameters, while underscore is available inside parameters, so neither is
      * permitted in an identifier.
      *
      * @return the identifier, queried once at registration
@@ -112,16 +112,15 @@ public:
     /**
      * @brief Resolves an ordinary placeholder.
      *
-     * @param player the online player the placeholder is being resolved against; may
-     *        be null. The pointer
-     * is borrowed for the duration of this call only.
-     * @param params everything after the first colon of the
-     * placeholder, preserved byte for byte including underscores, dots, later colons, case and spaces; empty when the
+     * @param player the player the placeholder is being resolved against; may be
+     *        null, and may be an offline player that is not currently online
+     * @param params everything after the first colon of the placeholder, preserved
+     *        byte for byte including underscores, dots, later colons, case and spaces; empty when the
      *        placeholder was written as <code>{identifier:}</code>
      * @return the replacement value, or nullopt to leave the original
      *         placeholder text untouched
      */
-    [[nodiscard]] virtual std::optional<std::string> onRequest(const endstone::Player *player,
+    [[nodiscard]] virtual std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
                                                                std::string_view params) = 0;
 
     /**
@@ -129,11 +128,10 @@ public:
      *
      * Only called when supportsRelationalPlaceholders returns true.
      *
-     * @param one the first player, borrowed for this call only
-     * @param two the second player, borrowed for this
-     * call only
-     * @param params everything after the second colon in <code>{rel:identifier:params}</code>,
-     * preserved byte for byte
+     * @param one the first player
+     * @param two the second player
+     * @param params everything after the second colon in
+     *        <code>{rel:identifier:params}</code>, preserved byte for byte
      * @return the replacement value, or nullopt to leave the original
      *         placeholder text untouched
      */
@@ -153,7 +151,7 @@ public:
      * Only called when supportsPlayerCleanup returns true. This does not change
      * the expansion's registration.
      *
-     * @param player the player who quit, borrowed for this call only
+     * @param player the player who quit
      */
     virtual void onPlayerQuit(const endstone::Player &player) { (void)player; }
 

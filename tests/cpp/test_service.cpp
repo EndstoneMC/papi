@@ -123,14 +123,14 @@ TEST_F(ServiceTest, IsRegisteredRejectsInvalidQueries)
 TEST_F(ServiceTest, EmitsOneRegisteredEventOnlyOnSuccess)
 {
     add("demo", owner_);
-    EXPECT_EQ(countEventsNamed("endstone_papi.ExpansionRegisteredEvent"), 1U);
+    EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 1U);
 
     auto duplicate = std::make_shared<FakeExpansion>("demo");
     EXPECT_FALSE(service_->registerExpansion(other_owner_, duplicate));
     auto refused = std::make_shared<FakeExpansion>("other");
     refused->can_register = false;
     EXPECT_FALSE(service_->registerExpansion(owner_, refused));
-    EXPECT_EQ(countEventsNamed("endstone_papi.ExpansionRegisteredEvent"), 1U);
+    EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 1U);
 }
 
 TEST_F(ServiceTest, MetadataExceptionDuringRegistrationIsAtomic)
@@ -139,7 +139,7 @@ TEST_F(ServiceTest, MetadataExceptionDuringRegistrationIsAtomic)
     expansion->throw_from_identifier = true;
     EXPECT_FALSE(service_->registerExpansion(owner_, expansion));
     EXPECT_FALSE(service_->isRegistered("demo"));
-    EXPECT_EQ(countEventsNamed("endstone_papi.ExpansionRegisteredEvent"), 0U);
+    EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 0U);
     EXPECT_TRUE(platform_->logger.anyContains("reading its metadata raised an error"));
 }
 
@@ -149,14 +149,14 @@ TEST_F(ServiceTest, PreflightExceptionDuringRegistrationIsAtomic)
     expansion->throw_from_can_register = true;
     EXPECT_FALSE(service_->registerExpansion(owner_, expansion));
     EXPECT_FALSE(service_->isRegistered("demo"));
-    EXPECT_EQ(countEventsNamed("endstone_papi.ExpansionRegisteredEvent"), 0U);
+    EXPECT_EQ(countEventsNamed("ExpansionRegisteredEvent"), 0U);
     EXPECT_TRUE(platform_->logger.anyContains("raised an error during its registration check"));
 }
 
 TEST_F(ServiceTest, SelfParseCycleIsBounded)
 {
     auto expansion = std::make_shared<FakeExpansion>("a");
-    expansion->on_request = [&](const endstone::Player *, std::string_view) {
+    expansion->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
         return service_->setPlaceholders(nullptr, "{a:x}");
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, expansion));
@@ -171,10 +171,10 @@ TEST_F(ServiceTest, IndirectParseCycleIsBounded)
 {
     auto a = std::make_shared<FakeExpansion>("a");
     auto b = std::make_shared<FakeExpansion>("b");
-    a->on_request = [&](const endstone::Player *, std::string_view) {
+    a->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
         return service_->setPlaceholders(nullptr, "{b:y}");
     };
-    b->on_request = [&](const endstone::Player *, std::string_view) {
+    b->on_request = [&](const endstone::OfflinePlayer *, std::string_view) {
         return service_->setPlaceholders(nullptr, "{a:x}");
     };
     ASSERT_TRUE(service_->registerExpansion(owner_, a));
@@ -190,7 +190,7 @@ TEST_F(ServiceTest, NestedParsingAcrossServicesDoesNotAliasManagerLocalGeneratio
     auto other_service = std::make_shared<PlaceholderApiImpl>(platform_, papi_plugin_.getName());
     auto outer = std::make_shared<FakeExpansion>("outer");
     auto inner = std::make_shared<FakeExpansion>("inner");
-    outer->on_request = [other_service](const endstone::Player *, std::string_view) {
+    outer->on_request = [other_service](const endstone::OfflinePlayer *, std::string_view) {
         return other_service->setPlaceholders(nullptr, "{inner:x}");
     };
     inner->value = "leaf";
@@ -211,7 +211,7 @@ TEST_F(ServiceTest, ParseDepthBudgetIsEnforced)
     for (int i = 0; i < chain_length; ++i) {
         auto exp = std::make_shared<FakeExpansion>("e" + std::to_string(i));
         auto next_token = (i + 1 < chain_length) ? "{e" + std::to_string(i + 1) + ":x}" : "leaf";
-        exp->on_request = [&, next_token = std::move(next_token)](const endstone::Player *, std::string_view) {
+        exp->on_request = [&, next_token = std::move(next_token)](const endstone::OfflinePlayer *, std::string_view) {
             return service_->setPlaceholders(nullptr, next_token);
         };
         ASSERT_TRUE(service_->registerExpansion(owner_, exp));
@@ -230,7 +230,7 @@ TEST_F(ServiceTest, EmitsUnregisteredEventAfterCleanup)
 
     EXPECT_TRUE(service_->unregisterExpansion(owner_, "demo"));
     EXPECT_EQ(expansion->unregister_calls, 1);
-    ASSERT_EQ(countEventsNamed("endstone_papi.ExpansionUnregisteredEvent"), 1U);
+    ASSERT_EQ(countEventsNamed("ExpansionUnregisteredEvent"), 1U);
     EXPECT_EQ(expansion->last_unregister_reason, UnregisterReason::Explicit);
 }
 
@@ -391,7 +391,7 @@ TEST_F(ServiceTest, ShutdownSuppressesUnregisterEvents)
 
     service_->shutdown();
 
-    EXPECT_EQ(countEventsNamed("endstone_papi.ExpansionUnregisteredEvent"), 0U);
+    EXPECT_EQ(countEventsNamed("ExpansionUnregisteredEvent"), 0U);
 }
 
 TEST_F(ServiceTest, ShutdownIsIdempotent)
@@ -555,7 +555,8 @@ TEST_F(ServiceTest, ExpansionCanUnregisterItselfFromInsideItsCallback)
     auto expansion = std::make_shared<FakeExpansion>("player");
     auto *service = service_.get();
     auto *owner = &owner_;
-    expansion->on_request = [service, owner](const endstone::Player *, std::string_view) -> std::optional<std::string> {
+    expansion->on_request = [service, owner](const endstone::OfflinePlayer *,
+                                             std::string_view) -> std::optional<std::string> {
         service->unregisterExpansion(*owner, "player");
         return "value";
     };

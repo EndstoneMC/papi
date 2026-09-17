@@ -17,7 +17,7 @@ public:
 
     [[nodiscard]] bool supportsRelationalPlaceholders() const override { return true; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *player,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
                                                        const std::string_view params) override
     {
         if (params != "name") {
@@ -41,10 +41,8 @@ class DemoPlugin final : public endstone::Plugin {
 public:
     void onEnable() override
     {
-        api_ = getServer()
-                   .getServiceManager()
-                   .load<papi::PlaceholderAPI>(std::string(papi::PlaceholderAPI::ServiceName))
-                   .get();
+        api_ =
+            getServer().getServiceManager().load<papi::PlaceholderAPI>(std::string(papi::PlaceholderAPI::ServiceName));
         if (!api_ || !api_->isActive()) {
             getLogger().warning("PlaceholderAPI is unavailable.");
             return;

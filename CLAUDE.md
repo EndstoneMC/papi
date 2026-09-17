@@ -27,14 +27,13 @@ become the PlaceholderAPI core.
 - CMake 3.29 or newer
 - Ninja
 - Conan 2
-- Windows: LLVM clang-cl 18 or newer, the MSVC x64 build environment, and the Windows SDK
-- Linux: Clang 18 or newer with libc++ and libc++abi
-- Python 3.11–3.14 for the package and test tooling
+- Windows: LLVM clang-cl 20, the MSVC x64 build environment, and the Windows SDK
+- Linux: Clang 20 with libc++ and libc++abi
+- Python 3.10+ for the package and test tooling
 
 The repository owns `.conan2/profiles/default` and `.conanrc`. The profile selects
 RelWithDebInfo, C++20, Ninja, clang-cl on Windows, and Clang with libc++ on Linux. Do
-not run `conan profile detect`, because that would replace the project profile. Official
-release wheels remain pinned to Clang 20 for reproducibility.
+not run `conan profile detect`, because that would replace the project profile.
 
 ### Configure and build
 
@@ -56,25 +55,7 @@ The main outputs are:
 
 For local Endstone development, CMake accepts
 `-DFETCHCONTENT_SOURCE_DIR_ENDSTONE=<path>` to use an existing Endstone checkout.
-Otherwise it fetches Endstone API 0.12 commit `e7eab9222abb92103714837ebe26672ee213f688`.
-The matching Python distribution is `endstone==0.11.11.dev392`, from official
-Endstone build `33562961160`; the package version differs from the API version.
-Run `python tools/prepare_endstone_wheels.py --output-dir .endstone-wheelhouse`
-with GitHub CLI authentication to obtain the verified wheels. Set `PIP_FIND_LINKS`
-to the wheelhouse's absolute path and `PIP_ONLY_BINARY=endstone` for pip and PEP 517
-build isolation. Linux repair and runtime tests must use these same official
-binaries, never a rebuilt source archive. Do not assume this snapshot is on PyPI.
-
-CI uses `.github/workflows/stage-endstone.yml` to stage the verified wheelhouse.
-An administrator must restrict the `endstone-artifacts` environment to `main`
-and put `ENDSTONE_ARTIFACTS_TOKEN` there with Actions read access to
-`EndstoneMC/endstone`. Never use a repository-secret fallback. Dispatch staging
-from `main`, then set repository variable `ENDSTONE_WHEELHOUSE_RUN_ID` to its
-successful run ID; restage before artifact expiry. Candidate jobs download that
-same-repository artifact with their ordinary token and run `--verify-only`.
-Missing configuration fails explicitly, including in forks without their own
-staging setup. Environment restrictions and initial staging require administrator
-setup and are not configured by this source change.
+Otherwise it fetches Endstone `v0.11.8`.
 
 ## Test Commands
 
@@ -278,7 +259,7 @@ headers. The dependency direction is enforced by `tests/test_architecture_bounda
 - Internal registry types (`ExpansionManager`, entries, call leases).
 - Private implementation details (locks, maps, throttle state).
 - Endstone server implementation headers (only `endstone::Plugin`, `endstone::Player`,
-  and `endstone::Service` are acceptable).
+  `endstone::OfflinePlayer`, `endstone::Service` are acceptable).
 
 ### Python public surface
 
@@ -314,7 +295,7 @@ lowered recursion limit and exact dispatch counts.
   acquire the GIL.
 - Never release the GIL while holding the registry lock.
 - Never let a Python exception cross into Endstone command/event/service code.
-- Null C++ `Player*` maps to Python `None`; never dereference before binding.
+- Null C++ `OfflinePlayer*` maps to Python `None`; never dereference before binding.
 - Python return values: only `None` or exact `str` are accepted. Wrong types are
   contained provider errors, never coerced with `str()`.
 
@@ -433,26 +414,18 @@ reserved by relational syntax.
 
 ### Supported matrix
 
-- CPython 3.11–3.14 (`cp311`–`cp314`)
+- CPython 3.10–3.14 (`cp310`–`cp314`)
 - Windows x86-64 (`win_amd64`)
 - manylinux x86-64 (`manylinux_x86_64`)
 
 ### ABI
 
-- Tied to the pinned Endstone API 0.12 snapshot, C++20, target architecture, standard library, compiler runtime,
+- Tied to Endstone 0.11, C++20, target architecture, standard library, compiler runtime,
   and Python minor wheel.
-- Rebuild native consumers and providers against the migrated SDK and pinned Endstone snapshot.
-  Ordinary callbacks take `const endstone::Player*`, replacing `OfflinePlayer`.
-- Endstone 0.12 service loading returns `Nullable<T>`; after checking it, copy `.get()`
-  to retain its `shared_ptr<T>`. Retained PAPI services become inert after shutdown.
 - C++ providers must use a toolchain compatible with the running Endstone/PAPI build.
 - Implementation/private locks/maps/pybind types must not leak into public headers.
 
 ## Release Workflow
-
-Non-dry-run production releases are blocked while the runtime dependency is the
-`0.11.11.dev392` development snapshot. Repin and validate a supported stable
-Endstone distribution before publishing; dry-run previews remain available.
 
 The canonical implementation is `.github/workflows/release.yml`. Do not replace or bypass
 it with manual version commits, tags, or GitHub Releases.

@@ -44,8 +44,9 @@ FORBIDDEN_ENDSTONE_IN_CORE = [
 ]
 
 # Endstone headers permitted in public headers (include/endstone_papi/).
-# Only Plugin, Player, Service, and the Event bases are public API.
+# Only Plugin, Player, OfflinePlayer, Service, and the Event bases are public API.
 ALLOWED_ENDSTONE_IN_PUBLIC = {
+    "endstone/offline_player.h",
     "endstone/player.h",
     "endstone/plugin/plugin.h",
     "endstone/plugin/service.h",

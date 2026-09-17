@@ -7,25 +7,9 @@ consumer never needs to know which language a placeholder came from.
 
 ## Install
 
-This development tree targets Endstone API 0.12 at commit
-`e7eab9222abb92103714837ebe26672ee213f688`. Its Python distribution version is
-`0.11.11.dev392`; the package version and plugin API version are different.
-Use the verified official wheels from Endstone build `33562961160`, matching your
-Python version and platform. This snapshot is not assumed to be available on PyPI.
-
-From a checkout with GitHub CLI authentication configured:
-
-```shell
-python tools/prepare_endstone_wheels.py --output-dir .endstone-wheelhouse
-python -m pip install --find-links .endstone-wheelhouse --only-binary endstone "endstone==0.11.11.dev392"
-python -m pip install --find-links .endstone-wheelhouse path/to/endstone_papi.whl
-python -m pip check
-```
-
-Use the actual PAPI wheel filename in the second install command. For a server,
-install the same Endstone snapshot in its environment, put the compatible PAPI
-wheel in `plugins`, and restart. Production release publication is blocked until
-the runtime is repinned to a supported stable Endstone distribution.
+- Download the official `.whl` from [GitHub Releases](https://github.com/EndstoneMC/papi/releases)
+- Put it in the `plugins` folder
+- Restart the server
 
 ## Placeholder syntax
 
@@ -85,7 +69,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "Endstone"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player *player,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer *player,
                                                        std::string_view params) override
     {
         if (params != "name") {
@@ -102,15 +86,6 @@ if (api && api->isActive()) {
     api->registerExpansion(*this, std::make_shared<NameExpansion>());
 }
 ```
-
-Endstone 0.12 returns a `Nullable<PlaceholderAPI>` from the service loader. Check it
-before use; `api.get()` returns a `shared_ptr` that can be copied to retain the
-service. Retained references become inert when PAPI shuts down.
-
-**Breaking migration:** ordinary callbacks now take `const endstone::Player*`
-(`Player | None` in Python), replacing `OfflinePlayer`. Rebuild all native PAPI
-consumers and providers against this SDK and the pinned Endstone snapshot with a
-compatible toolchain; existing binaries are not ABI-compatible.
 
 For the full code, see the [C++ example plugin](examples/cpp).
 
@@ -133,7 +108,7 @@ class NameExpansion(PlaceholderExpansion):
 
 
 class MyPlugin(Plugin):
-    api_version = "0.12"
+    api_version = "0.11"
     soft_depend = ["papi"]
 
     def on_enable(self):
@@ -160,14 +135,6 @@ must load a fresh service.
 
 ### Threading and introspection
 
-PAPI events use the dispatch names `endstone_papi.ExpansionRegisteredEvent` and
-`endstone_papi.ExpansionUnregisteredEvent`. Python listeners use Endstone's normal
-`@event_handler` and `register_events`; rebuilt C++ listeners use `EventType::NAME`.
-Rebuild native listeners and update raw unqualified event names when migrating.
-Event objects are borrowed for the callback only. Python `expansion_info` returns
-an independent snapshot safe to retain; C++ callers must copy `getExpansionInfo()`
-to retain metadata after the callback.
-
 Parsing and register/unregister mutations require the primary server thread, and provider
 callbacks execute there. `containsPlaceholders` / `contains_placeholders`, `isActive` /
 `active`, and copied registration metadata queries may be called from any thread. The
@@ -190,22 +157,17 @@ spaces, and selectors are not supported.
 
 ## Requirements
 
-Python: 3.11–3.14
+Python: 3.10+
 
-Endstone: `==0.11.11.dev392` (API 0.12, verified build `33562961160`)
+Endstone: `>=0.11.8,<0.12` (API 0.11)
 
 Supported packages: x86-64 Windows and Linux.
 
 ## Building from source
 
-Requires CMake 3.29+, Ninja, Conan 2.30.0, and the Endstone toolchain: clang-cl 18+
-with an x64 MSVC developer environment and Windows SDK on Windows, or Clang 18+ with
-libc++ and libc++abi on Linux. Official release wheels use the repository-pinned
-Clang 20 toolchain for reproducibility. Prepare the verified Endstone wheelhouse
-above first and set `PIP_FIND_LINKS` to its absolute path before running a PEP 517
-build (`$env:PIP_FIND_LINKS` in PowerShell, `export PIP_FIND_LINKS=...` in Bash).
-Set `PIP_ONLY_BINARY=endstone` as well. These settings reach build isolation;
-Linux repair and runtime installation must use the same official Endstone wheels.
+Requires CMake 3.29+, Ninja, Conan 2.30.0, and the Endstone toolchain: clang-cl 20
+with an x64 MSVC developer environment and Windows SDK on Windows, or Clang 20 with
+libc++ and libc++abi on Linux.
 
 ```shell
 python -m pip install "conan==2.30.0"
@@ -219,16 +181,6 @@ python -m build --wheel
 ```
 
 ## Contributing
-
-CI administrators must create the `endstone-artifacts` GitHub environment and
-restrict its deployment branches to `main` only. Store `ENDSTONE_ARTIFACTS_TOKEN`
-only in that environment, with Actions read access to `EndstoneMC/endstone`.
-Run **Stage Endstone wheelhouse** from `main`, then set repository variable
-`ENDSTONE_WHEELHOUSE_RUN_ID` to that successful run's ID. Restage before its
-artifact expires. These settings require administrator configuration; this
-checkout does not create them. Pull request and build jobs download the same-repository
-artifact and verify its pinned hashes without receiving the upstream token.
-Fork repositories need their own trusted staging setup; missing staging fails explicitly.
 
 Contributions are welcome! Feel free to fork the repository, improve the code, and
 submit pull requests with your changes.

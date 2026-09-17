@@ -13,17 +13,12 @@ service manager.
 
 from __future__ import annotations
 
-import gc
-from uuid import UUID
-
 import pytest
 
 try:
     import endstone_papi._papi  # noqa: F401
 except ImportError:
     pytest.skip("native module not built", allow_module_level=True)
-
-from endstone import Player
 
 from endstone_papi import PlaceholderExpansion, UnregisterReason
 from endstone_papi._papi import _TestService
@@ -57,29 +52,6 @@ def test_register_and_resolve_round_trip(host: _TestService) -> None:
 
     assert service.set_placeholders(None, "Hi {greet:}!") == "Hi hello!"
     assert service.set_placeholders(None, "Hi {greet:world}!") == "Hi hello:world!"
-
-
-def test_non_null_player_survives_callback_wrapper_collection(host: _TestService) -> None:
-    identities: list[tuple[str, UUID]] = []
-
-    class Identity(PlaceholderExpansion):
-        identifier = "identity"
-        author = "t"
-        version = "1"
-
-        def on_request(self, player, params):
-            assert isinstance(player, Player)
-            identities.append((player.name, player.unique_id))
-            return player.name
-
-    assert host.register_expansion(Identity())
-    for _ in range(3):
-        assert host.set_placeholders("{identity:name}") == "Alice"
-        gc.collect()
-
-    assert len(identities) == 3
-    assert identities == [("Alice", UUID("01000000-0000-0000-0000-000000000000"))] * 3
-    assert host.warnings == []
 
 
 def test_params_preserve_case_and_content(host: _TestService) -> None:

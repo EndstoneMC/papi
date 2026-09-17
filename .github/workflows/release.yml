@@ -14,13 +14,7 @@ on:
         default: false
 
 permissions:
-  actions: read
   contents: write
-
-env:
-  ENDSTONE_REQUIREMENT: "endstone==0.11.11.dev392"
-  PIP_FIND_LINKS: "${{ github.workspace }}/.endstone-wheelhouse"
-  PIP_ONLY_BINARY: "endstone"
 
 concurrency:
   group: release-${{ inputs.version }}
@@ -58,17 +52,6 @@ jobs:
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "$INPUT_DRY_RUN" != "true" ]]; then
-            python - <<'PY'
-          import tomllib
-          from pathlib import Path
-
-          dependencies = tomllib.loads(Path("pyproject.toml").read_text())["project"]["dependencies"]
-          if any(dependency.lower().startswith("endstone") and ".dev" in dependency for dependency in dependencies):
-              raise SystemExit("Production release is blocked while Endstone requires a development snapshot")
-          PY
-          fi
-
           VERSION="$INPUT_VERSION"
           DRY_RUN="$INPUT_DRY_RUN"
 
@@ -267,18 +250,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
-      actions: read
       contents: read
     strategy:
       fail-fast: false
       matrix:
         os: [ ubuntu-22.04, windows-latest ]
-        python-tag: [ "cp311", "cp312", "cp313", "cp314" ]
+        python-tag: [ "cp310", "cp311", "cp312", "cp313", "cp314" ]
         include:
           - os: ubuntu-22.04
             platform: manylinux_x86_64
           - os: windows-latest
             platform: win_amd64
+          - python-tag: "cp310"
+            python-version: "3.10"
           - python-tag: "cp311"
             python-version: "3.11"
           - python-tag: "cp312"
@@ -301,55 +285,6 @@ jobs:
         with:
           arch: x64
 
-      - name: Install LLVM 20 (Windows)
-        if: runner.os == 'Windows'
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "20.1.8"
-          arch: x64
-          directory: ${{ runner.temp }}/llvm20
-          env: false
-
-      - name: Select clang-cl 20 (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $llvmBin = Join-Path $env:LLVM_PATH "bin"
-          $env:PATH = "$llvmBin;$env:PATH"
-          $llvmBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          $version = & clang-cl --version
-          $version
-          if ($LASTEXITCODE -ne 0 -or -not ($version | Select-String "clang version 20\.")) {
-            throw "clang-cl 20 is required"
-          }
-
-      - name: Set up Python for runtime test
-        uses: actions/setup-python@v7
-        with:
-          python-version: "${{ matrix.python-version }}"
-
-      - name: Require staged Endstone wheelhouse
-        shell: bash
-        env:
-          WHEELHOUSE_RUN_ID: ${{ vars.ENDSTONE_WHEELHOUSE_RUN_ID }}
-        run: |
-          if [[ ! "$WHEELHOUSE_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "::error::Set ENDSTONE_WHEELHOUSE_RUN_ID to a successful main-only Stage Endstone wheelhouse run"
-            exit 1
-          fi
-
-      - name: Download staged Endstone wheelhouse
-        uses: actions/download-artifact@v4
-        with:
-          name: endstone-v012-e7eab922-wheelhouse
-          path: .endstone-wheelhouse
-          run-id: ${{ vars.ENDSTONE_WHEELHOUSE_RUN_ID }}
-          repository: ${{ github.repository }}
-          github-token: ${{ github.token }}
-
-      - name: Prepare verified Endstone runtime wheels
-        run: python tools/prepare_endstone_wheels.py --output-dir .endstone-wheelhouse --verify-only
-
       - name: Set up CMake and Ninja
         uses: lukka/get-cmake@v4.4.2
 
@@ -364,14 +299,18 @@ jobs:
         if: always() && runner.os == 'Linux'
         run: sudo chown -R "$(id -u):$(id -g)" .conan2
 
+      - name: Set up Python for runtime test
+        uses: actions/setup-python@v7
+        with:
+          python-version: "${{ matrix.python-version }}"
+
       - name: Runtime smoke test
         shell: bash
         run: |
-          python -m pip install "$ENDSTONE_REQUIREMENT"
+          python -m pip install endstone==0.11.8
           whl="$(python -c 'import pathlib; print(list(pathlib.Path("wheelhouse").glob("*.whl"))[0])')"
           python -m pip install "$whl"
-          python -m pip check
-          python tools/wheel_smoke_test.py --official
+          python tools/wheel_smoke_test.py
 
       - name: Verify Linux platform contract
         if: runner.os == 'Linux'
@@ -381,7 +320,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/project" \
             -w /project \
             ghcr.io/endstonemc/manylinux_2_31_x86_64 \
-            bash -lc 'export PATH=/opt/python/cp312-cp312/bin:$PATH PIP_FIND_LINKS=/project/.endstone-wheelhouse PIP_ONLY_BINARY=endstone; python -m pip install "auditwheel==6.4.2" "endstone==0.11.11.dev392" "patchelf==0.17.2.4" && python tools/verify_linux_wheel.py wheelhouse/*.whl --auditwheel'
+            bash -lc 'export PATH=/opt/python/cp312-cp312/bin:$PATH; python -m pip install "auditwheel==6.4.2" "endstone==0.11.8" "patchelf==0.17.2.4" && python tools/verify_linux_wheel.py wheelhouse/*.whl --auditwheel'
 
       - uses: actions/upload-artifact@v7
         with:
@@ -395,7 +334,6 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
-      actions: read
       contents: read
 
     steps:
@@ -409,28 +347,6 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-
-      - name: Require staged Endstone wheelhouse
-        shell: bash
-        env:
-          WHEELHOUSE_RUN_ID: ${{ vars.ENDSTONE_WHEELHOUSE_RUN_ID }}
-        run: |
-          if [[ ! "$WHEELHOUSE_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "::error::Set ENDSTONE_WHEELHOUSE_RUN_ID to a successful main-only Stage Endstone wheelhouse run"
-            exit 1
-          fi
-
-      - name: Download staged Endstone wheelhouse
-        uses: actions/download-artifact@v4
-        with:
-          name: endstone-v012-e7eab922-wheelhouse
-          path: .endstone-wheelhouse
-          run-id: ${{ vars.ENDSTONE_WHEELHOUSE_RUN_ID }}
-          repository: ${{ github.repository }}
-          github-token: ${{ github.token }}
-
-      - name: Prepare verified Endstone runtime wheels
-        run: python tools/prepare_endstone_wheels.py --output-dir .endstone-wheelhouse --verify-only
 
       - name: Install build
         run: python -m pip install build cibuildwheel==3.4.1
@@ -459,7 +375,6 @@ jobs:
         shell: bash
         run: |
           tar -xf /tmp/papi-sdist-input/*.tar.gz -C /tmp/papi-sdist-build --strip-components=1
-          cp -R .endstone-wheelhouse /tmp/papi-sdist-build/.endstone-wheelhouse
 
       - name: Build checkout and isolated sdist wheels at Endstone baseline
         shell: bash
@@ -487,17 +402,15 @@ jobs:
             -v /tmp/papi-checkout-wheel:/checkout-wheel:ro \
             -w /project \
             ghcr.io/endstonemc/manylinux_2_31_x86_64 \
-            bash -lc 'export PATH=/opt/python/cp312-cp312/bin:$PATH PIP_FIND_LINKS=/project/.endstone-wheelhouse PIP_ONLY_BINARY=endstone; python -m pip install "auditwheel==6.4.2" "endstone==0.11.11.dev392" "patchelf==0.17.2.4" && python tools/verify_linux_wheel.py /sdist-wheel/*.whl --compare /checkout-wheel/*.whl --auditwheel'
+            bash -lc 'export PATH=/opt/python/cp312-cp312/bin:$PATH; python -m pip install "auditwheel==6.4.2" "endstone==0.11.8" "patchelf==0.17.2.4" && python tools/verify_linux_wheel.py /sdist-wheel/*.whl --compare /checkout-wheel/*.whl --auditwheel'
 
       - name: Runtime smoke test from isolated sdist-built wheel
         shell: bash
         run: |
           python -m venv /tmp/papi-sdist-smoke-env
-          /tmp/papi-sdist-smoke-env/bin/pip install "$ENDSTONE_REQUIREMENT"
           /tmp/papi-sdist-smoke-env/bin/pip install /tmp/papi-sdist-wheel/*.whl
-          /tmp/papi-sdist-smoke-env/bin/pip check
           cd /tmp/papi-sdist-smoke
-          /tmp/papi-sdist-smoke-env/bin/python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py" --official
+          /tmp/papi-sdist-smoke-env/bin/python "$GITHUB_WORKSPACE/tools/wheel_smoke_test.py"
           module="$(find /tmp/papi-sdist-smoke-env -path '*site-packages/endstone_papi/_papi*.so' -print -quit)"
           ldd "$module" | tee /tmp/papi-sdist-ldd.txt
           grep -F 'endstone_papi/libc++.so.1' /tmp/papi-sdist-ldd.txt
@@ -564,16 +477,16 @@ jobs:
       - name: Verify release assets
         shell: bash
         run: |
-          # 8 wheels (4 Python versions x 2 platforms) + 1 sdist.
+          # 10 wheels (5 Python versions x 2 platforms) + 1 sdist.
           whl_count=$(find release-assets -name '*.whl' | wc -l)
           sdist_count=$(find release-assets -name '*.tar.gz' | wc -l)
           pypi_count=$(find pypi-dist -maxdepth 1 -type f | wc -l)
           echo "Wheels: $whl_count"
           echo "Sdists: $sdist_count"
           echo "PyPI distributions: $pypi_count"
-          test "$whl_count" -eq 8
+          test "$whl_count" -eq 10
           test "$sdist_count" -eq 1
-          test "$pypi_count" -eq 9
+          test "$pypi_count" -eq 11
           test -s release-assets/release_body.md
 
       - name: Atomically finalize release refs

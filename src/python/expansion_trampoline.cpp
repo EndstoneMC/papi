@@ -227,7 +227,7 @@ bool PyPlaceholderExpansion::supportsPlayerCleanup() const
     return booleanCall(self, "supports_player_cleanup", false);
 }
 
-std::optional<std::string> PyPlaceholderExpansion::onRequest(const endstone::Player *player,
+std::optional<std::string> PyPlaceholderExpansion::onRequest(const endstone::OfflinePlayer *player,
                                                              const std::string_view params)
 {
     const py::gil_scoped_acquire gil;
@@ -241,7 +241,7 @@ std::optional<std::string> PyPlaceholderExpansion::onRequest(const endstone::Pla
     if (!method) {
         throw std::runtime_error("expansion must implement on_request");
     }
-    const auto result = method(py::cast(player, py::return_value_policy::reference), py::str(std::string(params)));
+    const auto result = method(py::cast(player), py::str(std::string(params)));
     return asOptionalString(result, "on_request");
 }
 
@@ -259,8 +259,7 @@ std::optional<std::string> PyPlaceholderExpansion::onRelationalRequest(const end
     if (!method) {
         return std::nullopt;
     }
-    const auto result = method(py::cast(&one, py::return_value_policy::reference),
-                               py::cast(&two, py::return_value_policy::reference), py::str(std::string(params)));
+    const auto result = method(py::cast(&one), py::cast(&two), py::str(std::string(params)));
     return asOptionalString(result, "on_relational_request");
 }
 
@@ -276,7 +275,7 @@ void PyPlaceholderExpansion::onPlayerQuit(const endstone::Player &player)
     if (!method) {
         return;
     }
-    method(py::cast(&player, py::return_value_policy::reference));
+    method(py::cast(&player));
 }
 
 void PyPlaceholderExpansion::onUnregister(const UnregisterReason reason)

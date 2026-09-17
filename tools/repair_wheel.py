@@ -30,7 +30,6 @@ from pathlib import Path
 _LIB_MAP = {
     "libc++.so.1": "libc++-",
     "libc++abi.so.1": "libc++abi-",
-    "libunwind.so.1": "libunwind-",
 }
 _CPP_RUNTIME_PREFIXES = ("libc++", "libc++abi", "libunwind")
 _MANYLINUX_PLATFORM = "manylinux_2_31_x86_64"

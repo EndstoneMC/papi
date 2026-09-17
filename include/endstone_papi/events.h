@@ -21,13 +21,12 @@ namespace papi {
  */
 class ExpansionRegisteredEvent : public endstone::ServerEvent {
 public:
-    inline static constexpr auto NAME = "endstone_papi.ExpansionRegisteredEvent";
-    [[nodiscard]] std::string getEventName() const override { return NAME; }
+    ENDSTONE_EVENT(ExpansionRegisteredEvent);
 
     explicit ExpansionRegisteredEvent(ExpansionInfo info) : info_(std::move(info)) {}
 
     /**
-     * @brief Metadata describing the expansion that was registered. Copy to retain after the callback.
+     * @brief Metadata describing the expansion that was registered.
      */
     [[nodiscard]] const ExpansionInfo &getExpansionInfo() const { return info_; }
 
@@ -47,8 +46,7 @@ private:
  */
 class ExpansionUnregisteredEvent : public endstone::ServerEvent {
 public:
-    inline static constexpr auto NAME = "endstone_papi.ExpansionUnregisteredEvent";
-    [[nodiscard]] std::string getEventName() const override { return NAME; }
+    ENDSTONE_EVENT(ExpansionUnregisteredEvent);
 
     ExpansionUnregisteredEvent(ExpansionInfo info, const UnregisterReason reason)
         : info_(std::move(info)), reason_(reason)
@@ -56,7 +54,7 @@ public:
     }
 
     /**
-     * @brief Metadata describing the expansion that was removed. Copy to retain after the callback.
+     * @brief Metadata describing the expansion that was removed.
      */
     [[nodiscard]] const ExpansionInfo &getExpansionInfo() const { return info_; }
 

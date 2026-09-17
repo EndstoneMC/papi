@@ -5,7 +5,7 @@ requires = [
     "conan==2.30.0",
     "pybind11==3.0.1",
     "auditwheel==6.4.2; sys_platform == 'linux'",
-    "endstone==0.11.11.dev392 ; sys_platform == 'linux'",
+    "endstone==0.11.8; sys_platform == 'linux'",
     "patchelf==0.17.2.4; sys_platform == 'linux'",
     "wheel==0.46.2; sys_platform == 'linux'",
 ]
@@ -22,13 +22,14 @@ authors = [
 ]
 description = "PlaceholderAPI framework for Endstone, with C++ and Python expansion providers."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 keywords = ["plugin", "python", "c++", "minecraft", "bedrock", "papi", "placeholder"]
 license = "MIT"
 license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -38,7 +39,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 # PAPI and Endstone share an ABI-sensitive native runtime.
-dependencies = ["endstone==0.11.11.dev392"]
+dependencies = ["endstone>=0.11.8,<0.12"]
 
 [project.urls]
 Homepage = "https://github.com/EndstoneMC/papi"
@@ -58,7 +59,6 @@ cmake.define = { BUILD_TESTING = "OFF", PAPI_BUILD_EXAMPLES = "OFF" }
 wheel.packages = ["endstone_papi"]
 install.components = ["python"]
 install.strip = false
-sdist.exclude = [".endstone-wheelhouse/**"]
 
 # Single version source: derive the wheel version from the CMake project() command
 # so CMakeLists.txt is the only file that needs updating at release time.
@@ -83,14 +83,14 @@ extend-exclude = [
 ]
 
 [tool.cibuildwheel]
-build = ["cp311-*", "cp312-*", "cp313-*", "cp314-*"]
+build = ["cp310-*", "cp311-*", "cp312-*", "cp313-*", "cp314-*"]
 skip = ["*-musllinux*", "*_i686", "*-win32"]
 
 [tool.cibuildwheel.linux]
 manylinux-x86_64-image = "ghcr.io/endstonemc/manylinux_2_31_x86_64"
-environment = { CC = "/usr/bin/clang-20", CXX = "/usr/bin/clang++-20", PIP_FIND_LINKS = "/project/.endstone-wheelhouse", PIP_ONLY_BINARY = "endstone" }
+environment = { CC = "/usr/bin/clang-20", CXX = "/usr/bin/clang++-20" }
 # Wheel repair requires Endstone's exact hashed runtime SONAMEs.
-before-build = "pip install ninja wheel 'endstone==0.11.11.dev392'"
+before-build = "pip install ninja wheel endstone==0.11.8"
 # The backend repairs wheels built directly or from an sdist.
 repair-wheel-command = ""
 before-all = [

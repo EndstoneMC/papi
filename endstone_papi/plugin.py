@@ -10,7 +10,7 @@ from ._papi import _PapiBootstrap
 
 
 class PlaceholderAPIPlugin(Plugin):
-    api_version = "0.12"
+    api_version = "0.11"
 
     commands = {
         "papi": {

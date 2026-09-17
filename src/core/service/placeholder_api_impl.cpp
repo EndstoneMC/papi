@@ -149,7 +149,7 @@ template <typename Fn>
  */
 class PlaceholderApiImpl::OrdinaryResolver final : public PlaceholderResolver {
 public:
-    OrdinaryResolver(const PlaceholderApiImpl &service, const endstone::Player *player)
+    OrdinaryResolver(const PlaceholderApiImpl &service, const endstone::OfflinePlayer *player)
         : service_(service), player_(player)
     {
     }
@@ -191,7 +191,7 @@ public:
 
 private:
     const PlaceholderApiImpl &service_;
-    const endstone::Player *player_;
+    const endstone::OfflinePlayer *player_;
 };
 
 /**
@@ -311,7 +311,8 @@ bool PlaceholderApiImpl::canOperate(const ErrorOperation operation, const std::s
     return false;
 }
 
-std::string PlaceholderApiImpl::setPlaceholders(const endstone::Player *player, const std::string_view text) const
+std::string PlaceholderApiImpl::setPlaceholders(const endstone::OfflinePlayer *player,
+                                                const std::string_view text) const
 {
     if (!canOperate(ErrorOperation::ThreadPolicy, "parsing placeholders")) {
         return std::string(text);

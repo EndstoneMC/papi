@@ -20,7 +20,7 @@ class NameExpansion(PlaceholderExpansion):
 
 
 class JoinExample(Plugin):
-    api_version = "0.12"
+    api_version = "0.11"
     soft_depend = ["papi"]
 
     def __init__(self) -> None:

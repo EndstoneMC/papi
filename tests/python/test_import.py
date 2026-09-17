@@ -68,7 +68,7 @@ def test_plugin_entry_point_is_a_thin_bootstrap() -> None:
 
     plugin = endstone_papi.PlaceholderAPIPlugin
     assert issubclass(plugin, Plugin)
-    assert plugin.api_version == "0.12"
+    assert plugin.api_version == "0.11"
 
     for framework_method in ("set_placeholders", "register_expansion", "is_registered"):
         assert not hasattr(plugin, framework_method)

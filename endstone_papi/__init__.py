@@ -40,7 +40,7 @@ except ImportError as _e:
         f"Failed to load the native PAPI extension: {_e}. "
         "This usually means the Endstone C++ runtime is not available or "
         "the installed Endstone version is incompatible. "
-        "PAPI requires the official endstone==0.11.11.dev392 wheels (API 0.12)."
+        "PAPI requires endstone>=0.11.8,<0.12."
     ) from _e
 
 from .plugin import PlaceholderAPIPlugin

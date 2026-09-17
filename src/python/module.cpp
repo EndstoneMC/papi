@@ -45,13 +45,6 @@ bool registerExpansionFromPython(papi::PlaceholderAPI &service, endstone::Plugin
 }
 
 #ifdef PAPI_TEST_BINDINGS
-template <typename Event>
-bool dispatchTestEvent(Event &event, const py::function &handler)
-{
-    const auto info = handler(py::cast(static_cast<endstone::Event *>(&event), py::return_value_policy::reference));
-    return info.cast<const papi::ExpansionInfo *>() != &event.getExpansionInfo();
-}
-
 // In-memory platform for Python binding tests.
 class TestPlatform final : public papi::detail::Platform {
 public:
@@ -117,11 +110,6 @@ public:
     }
 
     std::size_t unregisterExpansions() { return service_->unregisterExpansions(*plugin_); }
-
-    [[nodiscard]] std::string setPlaceholders(std::string_view text) const
-    {
-        return service_->setPlaceholders(&alice_, text);
-    }
 
     [[nodiscard]] std::string setRelationalPlaceholders(std::string_view text) const
     {
@@ -256,17 +244,14 @@ PYBIND11_MODULE(_papi, m)
     py::class_<papi::ExpansionRegisteredEvent, endstone::Event>(
         m, "ExpansionRegisteredEvent", "Fired after an expansion has been added to the registry.")
         .def_property_readonly("expansion_info", &papi::ExpansionRegisteredEvent::getExpansionInfo,
-                               py::return_value_policy::copy,
-                               "Copied metadata describing the expansion that was registered.")
-        .attr("__module__") = "endstone_papi";
+                               "Metadata describing the expansion that was registered.");
 
     py::class_<papi::ExpansionUnregisteredEvent, endstone::Event>(
         m, "ExpansionUnregisteredEvent", "Fired after an expansion has been removed from the registry.")
         .def_property_readonly("expansion_info", &papi::ExpansionUnregisteredEvent::getExpansionInfo,
-                               py::return_value_policy::copy,
-                               "Copied metadata describing the expansion that was removed.")
-        .def_property_readonly("reason", &papi::ExpansionUnregisteredEvent::getReason, "Why the expansion was removed.")
-        .attr("__module__") = "endstone_papi";
+                               "Metadata describing the expansion that was removed.")
+        .def_property_readonly("reason", &papi::ExpansionUnregisteredEvent::getReason,
+                               "Why the expansion was removed.");
 
     py::class_<papi::detail::PapiBootstrap>(m, "_PapiBootstrap", "Internal native lifecycle state for the PAPI plugin.")
         .def(py::init<>())
@@ -286,16 +271,6 @@ PYBIND11_MODULE(_papi, m)
         return std::make_shared<papi::python::GilSafeExpansionProxy>(expansion, *native);
     });
 
-    m.def("_test_dispatch_event", [](const bool registered, const py::function &handler) {
-        const papi::ExpansionInfo info{"event-test", "Event Test", "tester", "1", "owner", "dependency", true};
-        if (registered) {
-            papi::ExpansionRegisteredEvent event{info};
-            return dispatchTestEvent(event, handler);
-        }
-        papi::ExpansionUnregisteredEvent event{info, papi::UnregisterReason::OwnerDisabled};
-        return dispatchTestEvent(event, handler);
-    });
-
     py::class_<TestService>(m, "_TestService", "Test-only: PlaceholderAPI backed by an in-memory platform.")
         .def(py::init<std::string>(), py::arg("plugin_name"))
         .def_property_readonly("service", &TestService::service, "The native PlaceholderAPI service.")
@@ -308,8 +283,6 @@ PYBIND11_MODULE(_papi, m)
              "Unregisters one expansion owned by the test plugin.")
         .def("unregister_expansions", &TestService::unregisterExpansions,
              "Unregisters every expansion owned by the test plugin.")
-        .def("set_placeholders", &TestService::setPlaceholders, py::arg("text"),
-             "Dispatches ordinary placeholders with an in-memory test player.")
         .def("set_relational_placeholders", &TestService::setRelationalPlaceholders, py::arg("text"),
              "Dispatches relational placeholders with two in-memory test players.")
         .def("handle_player_quit", &TestService::handlePlayerQuit,

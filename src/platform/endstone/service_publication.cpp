@@ -65,7 +65,7 @@ std::shared_ptr<PlaceholderAPI> ServicePublication::load(const endstone::Service
         }
     }
 
-    if (selected.get().get() != published.get() || !published->isActive()) {
+    if (selected.get() != published.get() || !published->isActive()) {
         return nullptr;
     }
     return published;

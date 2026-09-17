@@ -27,7 +27,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "shared-fixture"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player * /*player*/,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer * /*player*/,
                                                        std::string_view params) override
     {
         return std::string{"shared-value-"} + std::string{params};

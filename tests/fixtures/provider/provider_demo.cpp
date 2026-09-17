@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include <endstone/player.h>
+#include <endstone/offline_player.h>
 
 #include <endstone_papi/placeholder_expansion.h>
 #include <endstone_papi/unregister_reason.h>
@@ -32,7 +32,7 @@ public:
     [[nodiscard]] std::string getAuthor() const override { return "fixture"; }
     [[nodiscard]] std::string getVersion() const override { return "1.0.0"; }
 
-    [[nodiscard]] std::optional<std::string> onRequest(const endstone::Player * /*player*/,
+    [[nodiscard]] std::optional<std::string> onRequest(const endstone::OfflinePlayer * /*player*/,
                                                        std::string_view params) override
     {
         return std::string{"value-"} + std::string{params};
