@@ -38,8 +38,8 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
 ]
-# PAPI and Endstone share an ABI-sensitive native runtime.
-dependencies = ["endstone==0.11.11"]
+# Build dependencies remain pinned independently of this runtime range.
+dependencies = ["endstone>=0.11.8,<0.12"]
 
 [project.urls]
 Homepage = "https://github.com/EndstoneMC/papi"

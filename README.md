@@ -159,7 +159,10 @@ spaces, and selectors are not supported.
 
 Python: 3.10+
 
-Endstone: `==0.11.11` (API 0.11)
+Endstone: `>=0.11.8,<0.12` (API 0.11)
+
+Build and CI baseline: `0.11.11`. The dependency range alone does not
+establish native wheel compatibility with every permitted Endstone version.
 
 Supported packages: x86-64 Windows and Linux.
 

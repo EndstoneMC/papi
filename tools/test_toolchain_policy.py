@@ -26,6 +26,15 @@ sys.modules[SMOKE_SPEC.name] = wheel_smoke
 SMOKE_SPEC.loader.exec_module(wheel_smoke)
 
 
+def test_endstone_runtime_range_preserves_exact_build_baseline() -> None:
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert config["project"]["dependencies"] == ["endstone>=0.11.8,<0.12"]
+    assert "endstone==0.11.11; sys_platform == 'linux'" in config["build-system"]["requires"]
+    assert "endstone==0.11.11" in config["tool"]["cibuildwheel"]["linux"]["before-build"]
+    cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert 'set(PAPI_ENDSTONE_TAG "v0.11.11" CACHE STRING' in cmake
+
+
 def test_cmake_requires_endstone_compiler_family_and_records_provenance() -> None:
     source = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
     assert 'CMAKE_CXX_COMPILER_ID MATCHES "Clang"' in source
