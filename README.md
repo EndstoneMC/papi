@@ -156,9 +156,9 @@ spaces, and selectors are not supported.
 
 ## Requirements
 
-Python: 3.10+
+Python: 3.11+
 
-Endstone: `>=0.11.8,<0.12` (API 0.11)
+Endstone: `>=0.11,<0.12` (API 0.11)
 
 Platforms: x86-64 Windows and Linux.
 

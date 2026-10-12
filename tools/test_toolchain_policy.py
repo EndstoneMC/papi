@@ -6,11 +6,10 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
-
-import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 REPAIR_SPEC = importlib.util.spec_from_file_location("papi_repair_wheel", ROOT / "tools" / "repair_wheel.py")
@@ -28,11 +27,11 @@ SMOKE_SPEC.loader.exec_module(wheel_smoke)
 
 def test_endstone_runtime_range_preserves_exact_build_baseline() -> None:
     config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert config["project"]["dependencies"] == ["endstone>=0.11.8,<0.12"]
-    assert "endstone==0.11.11; sys_platform == 'linux'" in config["build-system"]["requires"]
-    assert "endstone==0.11.11" in config["tool"]["cibuildwheel"]["linux"]["before-build"]
+    assert config["project"]["dependencies"] == ["endstone>=0.11,<0.12"]
+    assert "endstone==0.11.14; sys_platform == 'linux'" in config["build-system"]["requires"]
+    assert "endstone==0.11.14" in config["tool"]["cibuildwheel"]["linux"]["before-build"]
     cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-    assert 'set(PAPI_ENDSTONE_TAG "v0.11.11" CACHE STRING' in cmake
+    assert 'set(PAPI_ENDSTONE_TAG "v0.11.14" CACHE STRING' in cmake
 
 
 def test_cmake_requires_endstone_compiler_family_and_records_provenance() -> None:
@@ -184,7 +183,7 @@ def test_wheel_validation_requires_compiler_provenance() -> None:
 
     assert "compiler_version=20." in workflow
     assert "validate_provenance" in (ROOT / "tools" / "wheel_smoke_test.py").read_text(encoding="utf-8")
-    assert "wheel_smoke_test.py --official" in workflow
+    assert 'python "{project}/tools/wheel_smoke_test.py" --official' in workflow
     assert "@CMAKE_CXX_COMPILER_VERSION@" in template
 
     repair = (ROOT / "tools" / "repair_wheel.py").read_text(encoding="utf-8")

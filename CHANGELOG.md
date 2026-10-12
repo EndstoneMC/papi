@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added support for Python 3.15.
+
+### Changed
+
+- Dropped Python 3.10 support; Python 3.11 is now the minimum.
+
 ## [0.1.0] - 2026-09-17
 
 ### Fixed

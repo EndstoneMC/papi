@@ -67,13 +67,13 @@ def test_no_libc_symlinks_in_package_directory() -> None:
 def test_pyproject_declares_endstone_runtime_dependency() -> None:
     """pyproject.toml must declare endstone as a runtime dependency."""
     content = _PYPROJECT.read_text(encoding="utf-8")
-    assert 'dependencies = ["endstone>=0.11.8,<0.12"]' in content, "Endstone runtime range changed"
+    assert 'dependencies = ["endstone>=0.11,<0.12"]' in content, "Endstone runtime range changed"
 
 
 def test_pyproject_linux_before_build_installs_endstone() -> None:
     """The Linux cibuildwheel before-build must install endstone for repair_wheel.py."""
     content = _PYPROJECT.read_text(encoding="utf-8")
-    assert "endstone==0.11.11" in content, "before-build must pin endstone for build-time SONAME discovery"
+    assert "endstone==0.11.14" in content, "before-build must pin endstone for build-time SONAME discovery"
     assert "pip install ninja wheel endstone" in content, "before-build must install wheel for unpacking and repacking"
 
 

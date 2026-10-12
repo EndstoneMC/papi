@@ -29,7 +29,7 @@ in native code rather than duplicating it in Python.
 - Conan 2
 - Windows: LLVM clang-cl 18 or newer, the MSVC x64 build environment, and the Windows SDK
 - Linux: Clang 18 or newer with libc++ and libc++abi
-- Python 3.10+ for the package and test tooling
+- Python 3.11+ for the package and test tooling
 
 The repository owns `.conan2/profiles/default` and `.conanrc`. The profile selects
 RelWithDebInfo, C++20, Ninja, clang-cl on Windows, and Clang with libc++ on Linux. CI
@@ -56,7 +56,7 @@ The main outputs are:
 
 For local Endstone development, CMake accepts
 `-DFETCHCONTENT_SOURCE_DIR_ENDSTONE=<path>` to use an existing Endstone checkout.
-Otherwise it fetches Endstone `v0.11.11` (API 0.11).
+Otherwise it fetches Endstone `v0.11.14` (API 0.11).
 
 ## Test Commands
 
@@ -414,14 +414,14 @@ reserved by relational syntax.
 
 ### Supported matrix
 
-- CPython 3.10–3.14 (`cp310`–`cp314`)
+- CPython 3.11–3.15 (`cp311`–`cp315`)
 - Windows x86-64 (`win_amd64`)
 - manylinux x86-64 (`manylinux_x86_64`)
 
 ### ABI
 
-- Official builds use Endstone `0.11.11` (API 0.11) as the C++ build baseline; package runtime support is
-  `endstone>=0.11.8,<0.12`.
+- Official builds use Endstone `0.11.14` (API 0.11) as the C++ build baseline; package runtime support is
+  `endstone>=0.11,<0.12`.
 - Native ABI compatibility also depends on C++20, target architecture, standard library, compiler runtime,
   and Python minor wheel.
 - C++ providers must use a toolchain compatible with the running Endstone/PAPI build.

@@ -45,7 +45,7 @@ if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
             "endstone_papi: Clang 18 or newer is required, but CMake detected ${CMAKE_CXX_COMPILER_VERSION}.")
 endif ()
 
-set(PAPI_ENDSTONE_TAG "v0.11.11" CACHE STRING "Endstone tag providing the public API headers")
+set(PAPI_ENDSTONE_TAG "v0.11.14" CACHE STRING "Endstone tag providing the public API headers")
 
 include(FetchContent)
 FetchContent_Declare(
