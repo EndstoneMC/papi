@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.29)
 
-project(papi VERSION 0.1.0 LANGUAGES CXX)
+project(papi VERSION 0.2.0 LANGUAGES CXX)
 
 # Generate the public version header from the CMake project version so that
 # getVersion() is header-only and CMakeLists.txt is the single version source.

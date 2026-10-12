@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-12
+
 ### Added
 
 - Added support for Python 3.15.
@@ -59,5 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `registerPlaceholder`, `getPlaceholderPattern`, Python `register_placeholder`,
   and `placeholder_pattern`.
 
-[Unreleased]: https://github.com/EndstoneMC/papi/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/EndstoneMC/papi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/EndstoneMC/papi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/EndstoneMC/papi/releases/tag/v0.1.0
